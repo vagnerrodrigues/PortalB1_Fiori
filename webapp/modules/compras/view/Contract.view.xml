@@ -1,0 +1,54 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Contract"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{parts: [{value: 'contractTitle'}, 'ag>/agreementNo'], formatter: '.formatter.txt'}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <ObjectHeader title="{ag>/description}" responsive="true" backgroundDesign="Transparent"
+        number="{path: 'ag>/usedAmount', formatter: '.formatter.money'}" numberUnit="{i18n>contractUsedAmount}">
+        <statuses>
+          <ObjectStatus text="{parts: [{value: 'agSt_'}, 'ag>/status'], formatter: '.formatter.prefixed'}" state="{path: 'ag>/status', formatter: '.formatter.agState'}" />
+          <ObjectStatus title="{i18n>contractConsumption}" text="{path: 'ag>/consumption', formatter: '.formatter.pct'}"
+            state="{path: 'ag>/consumption', formatter: '.formatter.consumptionState'}" />
+        </statuses>
+        <ObjectAttribute title="{i18n>supplier}" text="{ag>/cardCode} - {ag>/cardName}" />
+        <ObjectAttribute title="{i18n>contractValidity}" text="{parts: ['ag>/startDate', 'ag>/endDate'], formatter: '.formatter.period'}" />
+        <ObjectAttribute title="{i18n>contractPlannedAmount}" text="{path: 'ag>/plannedAmount', formatter: '.formatter.money'}" />
+        <ObjectAttribute title="{i18n>contractMethod}" text="{= ${ag>/method} === 'monetary' ? ${i18n>contractMonetary} : ${i18n>contractByItem} }" />
+        <ObjectAttribute title="{i18n>remarks}" text="{ag>/remarks}" visible="{= !!${ag>/remarks} }" />
+      </ObjectHeader>
+      <Table items="{ag>/lines}" headerText="{i18n>items}" class="sapUiResponsiveContentPadding">
+        <columns>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true" visible="{= ${ag>/method} !== 'monetary' }"><Text text="{i18n>orderPrice}" /></Column>
+          <Column hAlign="End" visible="{= ${ag>/method} !== 'monetary' }"><Text text="{i18n>contractPlannedQty}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true" visible="{= ${ag>/method} !== 'monetary' }"><Text text="{i18n>contractUsedQty}" /></Column>
+          <Column hAlign="End" visible="{= ${ag>/method} !== 'monetary' }"><Text text="{i18n>contractOpenQty}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>contractPlannedAmount}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>contractUsedAmount}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <ObjectIdentifier title="{ag>itemCode}" text="{ag>itemName}" />
+            <ObjectNumber number="{path: 'ag>unitPrice', formatter: '.formatter.money'}" />
+            <ObjectNumber number="{ag>plannedQty}" unit="{ag>uom}" />
+            <ObjectNumber number="{ag>usedQty}" unit="{ag>uom}" />
+            <ObjectNumber number="{ag>openQty}" unit="{ag>uom}" state="{= ${ag>openQty} > 0 ? 'Success' : 'Error' }" emphasized="true" />
+            <ObjectNumber number="{path: 'ag>plannedAmount', formatter: '.formatter.money'}" />
+            <ObjectNumber number="{path: 'ag>usedAmount', formatter: '.formatter.money'}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <Button text="{i18n>contractTerminate}" icon="sap-icon://locked" press=".onStatus('TERMINATED')"
+          visible="{= ${ag>/status} === 'ACTIVE' || ${ag>/status} === 'ONHOLD' }" />
+        <ToolbarSpacer />
+        <Button text="{i18n>contractHold}" icon="sap-icon://pause" press=".onStatus('ONHOLD')" visible="{= ${ag>/status} === 'ACTIVE' }" />
+        <Button text="{i18n>contractActivate}" icon="sap-icon://accept" press=".onStatus('ACTIVE')"
+          visible="{= ${ag>/status} === 'ONHOLD' || ${ag>/status} === 'DRAFT' }" />
+        <Button text="{i18n>contractNewOrder}" type="Emphasized" icon="sap-icon://sales-order" press=".onNewOrder"
+          visible="{= ${ag>/status} === 'ACTIVE' }" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

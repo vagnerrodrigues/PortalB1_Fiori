@@ -8,3 +8,4 @@ config/settings/
 config/secret.key
 config/branding.json
 config/reports.json
+data/

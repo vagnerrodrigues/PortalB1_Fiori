@@ -1,0 +1,41 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+  <Dialog id="sourcesDialog" title="{i18n>rfqSources}" contentWidth="64rem" contentHeight="70%" resizable="true" draggable="true">
+    <subHeader>
+      <OverflowToolbar>
+        <SearchField liveChange=".onSourcesSearch" width="100%" placeholder="{i18n>search}" />
+      </OverflowToolbar>
+    </subHeader>
+    <content>
+      <Table id="sourcesTable" mode="MultiSelect" items="{src>/}" noDataText="{i18n>noData}" growing="true" growingThreshold="100">
+        <infoToolbar>
+          <OverflowToolbar><Label text="{i18n>rfqSourcesHint}" /></OverflowToolbar>
+        </infoToolbar>
+        <columns>
+          <Column width="11rem"><Text text="{i18n>kind_pr}" /></Column>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column hAlign="End" width="7rem"><Text text="{i18n>quantity}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true" width="9rem"><Text text="{i18n>requiredDate}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>requester}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <VBox>
+              <Text text="N&#186; {src>prDocNum}" />
+              <ObjectStatus text="{parts: [{value: 'rfqInRfq'}, 'src>inRfq'], formatter: '.formatter.txt'}" state="Warning" visible="{= !!${src>inRfq} }" />
+            </VBox>
+            <ObjectIdentifier title="{src>itemCode}" text="{src>itemName}" />
+            <ObjectNumber number="{src>quantity}" unit="{src>uom}" />
+            <Text text="{path: 'src>requiredDate', formatter: '.formatter.date'}" />
+            <Text text="{src>requester}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+    </content>
+    <beginButton>
+      <Button text="{i18n>rfqAddSelected}" type="Emphasized" press=".onSourcesConfirm" />
+    </beginButton>
+    <endButton>
+      <Button text="{i18n>cancel}" press=".onSourcesClose" />
+    </endButton>
+  </Dialog>
+</core:FragmentDefinition>

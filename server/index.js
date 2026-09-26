@@ -39,7 +39,8 @@ function loadTenants() {
       companyDB: 'SBODEMO',
       // demo do controle de acesso: requisitante (depto 1) = Compras; comercial (depto 3) = Parceiros;
       // aprovador é superusuário (vê tudo); Relatórios liberado para todos
-      moduleAccess: { compras: { departments: [1, 2] }, parceiros: { departments: [2, 3] } }
+      // comprador (depto 4) vê as telas de comprador de Compras (cotação, ofertas, pedidos, contratos)
+      moduleAccess: { compras: { departments: [1, 2, 4], buyers: { departments: [4] } }, parceiros: { departments: [2, 3] } }
     }];
   }
   const file = process.env.TENANTS_FILE || path.join(__dirname, '..', 'config', 'tenants.json');
@@ -84,7 +85,11 @@ function describe(tenant, user) {
     branding: branding.forTenant(tenant),
     mock: MOCK,
     modules: access.modulesForUser(tenant, user, registry)
-      .map(({ id, title, description, tiles }) => ({ id, title, description, tiles }))
+      .map(({ id, title, description, tiles }) => ({
+        id, title, description,
+        tiles: tiles.filter((t) => access.canTile(tenant, user, id, t)).map(({ buyer, ...t }) => t),
+        buyer: tiles.some((t) => t.buyer) && access.canTile(tenant, user, id, { buyer: true })
+      }))
   };
 }
 
@@ -125,6 +130,11 @@ app.post('/api/logout', authed, wrap(async (req, res) => {
 
 app.get('/api/me', authed, (req, res) => res.json(describe(req.tenant, req.session.user)));
 
+// ---------- Rotas públicas dos módulos (sem login; ex.: resposta do fornecedor na cotação) ----------
+registry.filter((m) => m.createPublicRouter).forEach((mod) => {
+  app.use(`/api/public/${mod.id}`, mod.createPublicRouter({ mock: MOCK, wrap, tenantById }));
+});
+
 // ---------- Módulos: /api/m/<id>/... ----------
 registry.forEach((mod) => {
   const guard = (req, res, next) => {
@@ -134,13 +144,20 @@ registry.forEach((mod) => {
     }
     next();
   };
-  app.use(`/api/m/${mod.id}`, authed, guard, mod.createRouter({ mock: MOCK, wrap, audit }));
+  app.use(`/api/m/${mod.id}`, authed, guard, mod.createRouter({ mock: MOCK, wrap, audit, tenantById }));
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
 
 // ---------- Front SAPUI5 ----------
 app.use('/brand', express.static(path.join(__dirname, '..', 'config', 'brand'))); // logos do cliente
+// Página pública do fornecedor (cotação online): link exclusivo por token
+const webappDir = process.env.WEBAPP_DIR || path.join(__dirname, '..', 'webapp');
+app.get('/cotacao/:token', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Referrer-Policy', 'no-referrer'); // token não vaza para sites externos
+  res.sendFile(path.join(webappDir, 'public', 'cotacao.html'));
+});
 app.use(express.static(process.env.WEBAPP_DIR || path.join(__dirname, '..', 'webapp'), { index: 'index.html' }));
 
 app.use(errorHandler);

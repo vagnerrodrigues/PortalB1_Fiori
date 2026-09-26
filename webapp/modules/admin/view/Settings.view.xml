@@ -91,6 +91,12 @@
                   <Switch state="{cfg>/notify/generated}" />
                 </HBox>
               </CustomListItem>
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMargin">
+                  <VBox><Text text="{i18n>admEvRfqAnswered}" class="sapUiTinyMarginBottom" /><Label text="{i18n>admEvToBuyer}" /></VBox>
+                  <Switch state="{cfg>/notify/rfqAnswered}" />
+                </HBox>
+              </CustomListItem>
             </List>
           </IconTabFilter>
         </items>

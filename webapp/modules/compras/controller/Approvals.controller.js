@@ -15,9 +15,7 @@ sap.ui.define(["portal/b1/controller/BaseController", "sap/ui/model/json/JSONMod
 
     onOpen: function (oEvent) {
       var o = oEvent.getSource().getBindingContext("apr").getObject();
-      this.getRouter().navTo("compras.detail", {
-        source: "draft", entry: o.draftEntry, "?query": { mode: "approve", code: o.approvalCode }
-      });
+      this.navToDoc(o.kind || "pr", "draft", o.draftEntry, { mode: "approve", code: o.approvalCode });
     }
   });
 });

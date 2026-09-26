@@ -1,0 +1,33 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Orders"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>ordersTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh" />
+      <Button icon="sap-icon://add" text="{i18n>orderNew}" type="Emphasized" press=".onNew" />
+    </headerContent>
+    <subHeader>
+      <OverflowToolbar>
+        <SegmentedButton selectedKey="{view>/status}" selectionChange=".onRefresh">
+          <items>
+            <SegmentedButtonItem key="open" text="{i18n>open}" />
+            <SegmentedButtonItem key="closed" text="{i18n>closed}" />
+            <SegmentedButtonItem key="all" text="{i18n>all}" />
+          </items>
+        </SegmentedButton>
+        <SearchField liveChange=".onSearch" width="100%" placeholder="{i18n>search}" />
+      </OverflowToolbar>
+    </subHeader>
+    <List id="list" items="{list>/}" noDataText="{i18n>noData}" growing="true" growingThreshold="30">
+      <ObjectListItem title="{parts: ['list>kind', 'list>source', 'list>docNum', 'list>entry'], formatter: '.formatter.kindTitle'}"
+        type="Navigation" press=".onOpen" number="{path: 'list>total', formatter: '.formatter.money'}">
+        <firstStatus>
+          <ObjectStatus text="{parts: ['list>kind', 'list>status'], formatter: '.formatter.docStatusText'}"
+            state="{path: 'list>status', formatter: '.formatter.statusState'}" />
+        </firstStatus>
+        <ObjectAttribute text="{list>cardCode} - {list>cardName}" />
+        <ObjectAttribute text="{i18n>docDate}: {path: 'list>docDate', formatter: '.formatter.date'} · {i18n>dueDate}: {path: 'list>dueDate', formatter: '.formatter.date'}" />
+        <ObjectAttribute text="{list>comments}" visible="{= !!${list>comments}}" />
+      </ObjectListItem>
+    </List>
+  </Page>
+</mvc:View>

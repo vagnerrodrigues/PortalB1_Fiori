@@ -5,12 +5,13 @@
       <Button icon="sap-icon://refresh" press=".onRefresh" />
     </headerContent>
     <List items="{apr>/}" noDataText="{i18n>noData}" growing="true">
-      <ObjectListItem title="{parts: ['apr>docType', 'apr>draftEntry'], formatter: '.formatter.apprTitle'} · {apr>requester}" type="Navigation" press=".onOpen"
+      <ObjectListItem title="{parts: ['apr>kind', 'apr>docType', 'apr>draftEntry'], formatter: '.formatter.apprKindTitle'} · {apr>requester}" type="Navigation" press=".onOpen"
         number="{path: 'apr>total', formatter: '.formatter.money'}">
         <firstStatus>
           <ObjectStatus text="{i18n>status_PENDING}" state="Warning" />
         </firstStatus>
         <ObjectAttribute text="{i18n>docDate}: {path: 'apr>docDate', formatter: '.formatter.date'} · {i18n>requiredDate}: {path: 'apr>requiredDate', formatter: '.formatter.date'}" />
+        <ObjectAttribute text="{i18n>supplier}: {apr>cardName}" visible="{= !!${apr>cardName}}" />
         <ObjectAttribute text="{apr>comments}" visible="{= !!${apr>comments}}" />
       </ObjectListItem>
     </List>

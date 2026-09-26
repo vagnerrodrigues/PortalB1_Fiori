@@ -99,14 +99,59 @@
           "target": "compras.mine"
         },
         {
-          "name": "compras.detail",
-          "pattern": "compras/solicitacao/{source}/{entry}:?query:",
-          "target": "compras.detail"
-        },
-        {
           "name": "compras.approvals",
           "pattern": "compras/aprovacoes",
           "target": "compras.approvals"
+        },
+        {
+          "name": "compras.rfqs",
+          "pattern": "compras/cotacoes",
+          "target": "compras.rfqs"
+        },
+        {
+          "name": "compras.rfqNew",
+          "pattern": "compras/cotacoes/nova",
+          "target": "compras.rfqNew"
+        },
+        {
+          "name": "compras.rfq",
+          "pattern": "compras/cotacoes/{id}",
+          "target": "compras.rfq"
+        },
+        {
+          "name": "compras.offers",
+          "pattern": "compras/ofertas",
+          "target": "compras.offers"
+        },
+        {
+          "name": "compras.orders",
+          "pattern": "compras/pedidos",
+          "target": "compras.orders"
+        },
+        {
+          "name": "compras.orderNew",
+          "pattern": "compras/pedidos/novo:?query:",
+          "target": "compras.orderNew"
+        },
+        {
+          "name": "compras.contracts",
+          "pattern": "compras/contratos",
+          "target": "compras.contracts"
+        },
+        {
+          "name": "compras.contractNew",
+          "pattern": "compras/contratos/novo",
+          "target": "compras.contractNew"
+        },
+        {
+          "name": "compras.contract",
+          "pattern": "compras/contratos/{no}",
+          "target": "compras.contract"
+        },
+        {
+          "name": "compras.detail",
+          "pattern": "compras/{kind}/{source}/{entry}:?query:",
+          "target": "compras.detail"
         },
         {
           "name": "despesas.new",
@@ -229,6 +274,51 @@
           "id": "adminSettings",
           "name": "modules.admin.view.Settings",
           "level": 2
+        },
+        "compras.rfqs": {
+          "id": "comprasRfqs",
+          "name": "modules.compras.view.Rfqs",
+          "level": 2
+        },
+        "compras.rfqNew": {
+          "id": "comprasRfqNew",
+          "name": "modules.compras.view.RfqNew",
+          "level": 3
+        },
+        "compras.rfq": {
+          "id": "comprasRfq",
+          "name": "modules.compras.view.Rfq",
+          "level": 3
+        },
+        "compras.offers": {
+          "id": "comprasOffers",
+          "name": "modules.compras.view.Offers",
+          "level": 2
+        },
+        "compras.orders": {
+          "id": "comprasOrders",
+          "name": "modules.compras.view.Orders",
+          "level": 2
+        },
+        "compras.orderNew": {
+          "id": "comprasOrderNew",
+          "name": "modules.compras.view.OrderNew",
+          "level": 3
+        },
+        "compras.contracts": {
+          "id": "comprasContracts",
+          "name": "modules.compras.view.Contracts",
+          "level": 2
+        },
+        "compras.contractNew": {
+          "id": "comprasContractNew",
+          "name": "modules.compras.view.ContractNew",
+          "level": 3
+        },
+        "compras.contract": {
+          "id": "comprasContract",
+          "name": "modules.compras.view.Contract",
+          "level": 3
         }
       }
     }

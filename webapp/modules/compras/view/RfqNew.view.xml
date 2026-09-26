@@ -1,0 +1,95 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.RfqNew"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.ui.layout.form" xmlns:core="sap.ui.core"
+  core:require="{ Float: 'sap/ui/model/type/Float' }">
+  <Page title="{i18n>rfqNewTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <MessageStrip text="{i18n>rfqInfo}" type="Information" showIcon="true" class="sapUiSmallMargin" />
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3" columnsL="1" columnsM="1">
+        <Label text="{i18n>rfqName}" />
+        <Input value="{rfq>/title}" maxLength="80" placeholder="{i18n>rfqNamePh}" />
+        <Label text="{i18n>branch}" required="true" visible="{= ${md>/branches}.length > 0 }" />
+        <ComboBox selectedKey="{rfq>/branch}" items="{md>/branches}" width="22rem" visible="{= ${md>/branches}.length > 0 }">
+          <core:Item key="{md>id}" text="{md>name}" />
+        </ComboBox>
+        <Label text="{i18n>rfqDeadline}" required="true" />
+        <DatePicker value="{rfq>/deadline}" valueFormat="yyyy-MM-dd" displayFormat="medium" minDate="{rfq>/minDate}" width="14rem" />
+        <Label text="{i18n>rfqMessage}" />
+        <TextArea value="{rfq>/message}" maxLength="300" rows="2" growing="true" placeholder="{i18n>rfqMessagePh}" />
+      </f:SimpleForm>
+
+      <Table id="lines" items="{rfq>/lines}" noDataText="{i18n>rfqNeedLines}" class="sapUiResponsiveContentPadding">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{i18n>rfqItems} ({= ${rfq>/lines}.length})" />
+            <ToolbarSpacer />
+            <Button text="{i18n>rfqFromRequests}" icon="sap-icon://my-sales-order" press=".onFromRequests" type="Emphasized" />
+            <Button text="{i18n>rfqAddItem}" icon="sap-icon://add" press=".onAddManual" />
+          </OverflowToolbar>
+        </headerToolbar>
+        <columns>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column width="8rem" hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>quantity}" /></Column>
+          <Column width="4rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>uom}" /></Column>
+          <Column width="11rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>requiredDate}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>rfqOrigin}" /></Column>
+          <Column width="3rem" />
+        </columns>
+        <items>
+          <ColumnListItem>
+            <VBox>
+              <ObjectIdentifier title="{rfq>itemCode}" text="{rfq>itemName}" visible="{= !${rfq>manual} }" />
+              <Input value="{rfq>itemLabel}" visible="{= !!${rfq>manual} }" showSuggestion="true" filterSuggests="false" startSuggestion="2"
+                suggest=".onItemSuggest" suggestionItemSelected=".onItemSelected" liveChange=".onItemTyped"
+                valueState="{= ${rfq>itemLabel} &amp;&amp; !${rfq>itemCode} ? 'Warning' : 'None'}"
+                suggestionItems="{path: 'md>/itemSuggest', templateShareable: true}">
+                <suggestionItems>
+                  <core:ListItem key="{md>itemCode}" text="{md>itemCode} - {md>itemName}" additionalText="{md>uom}" />
+                </suggestionItems>
+              </Input>
+            </VBox>
+            <Input value="{path: 'rfq>quantity', type: 'Float', formatOptions: {minFractionDigits: 0, maxFractionDigits: 3}}" textAlign="End" />
+            <Text text="{rfq>uom}" />
+            <DatePicker value="{rfq>requiredDate}" valueFormat="yyyy-MM-dd" displayFormat="short" />
+            <Text text="{= ${rfq>prEntry} ? ${i18n>kind_pr} + ' ' + ${rfq>prDocNum} + ' · ' + ${rfq>requester} : ${i18n>rfqAddItem} }" />
+            <Button icon="sap-icon://delete" type="Transparent" press=".onRemoveLine" />
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <Table items="{rfq>/suppliers}" noDataText="{i18n>rfqNeedSuppliers}" class="sapUiResponsiveContentPadding sapUiMediumMarginTop">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{i18n>rfqSuppliers} ({= ${rfq>/suppliers}.length})" />
+            <ToolbarSpacer />
+            <Input id="supplierInput" width="22rem" placeholder="{i18n>rfqSupplierPh}" showSuggestion="true" filterSuggests="false"
+              startSuggestion="2" suggest=".onSupplierSuggest" suggestionItemSelected=".onSupplierPick"
+              suggestionItems="{path: 'md>/vendorSuggest', templateShareable: true}">
+              <suggestionItems>
+                <core:ListItem key="{md>cardCode}" text="{md>cardCode} - {md>cardName}" />
+              </suggestionItems>
+            </Input>
+          </OverflowToolbar>
+        </headerToolbar>
+        <columns>
+          <Column><Text text="{i18n>supplier}" /></Column>
+          <Column><Text text="{i18n>rfqEmail}" /></Column>
+          <Column width="3rem" />
+        </columns>
+        <items>
+          <ColumnListItem>
+            <ObjectIdentifier title="{rfq>cardName}" text="{rfq>cardCode}" />
+            <Input value="{rfq>email}" type="Email" placeholder="{i18n>rfqEmailPh}" />
+            <Button icon="sap-icon://delete" type="Transparent" press=".onRemoveSupplier" />
+          </ColumnListItem>
+        </items>
+      </Table>
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <Text text="{= ${rfq>/lines}.length } {i18n>items} · {= ${rfq>/suppliers}.length } {i18n>rfqSuppliers}" />
+        <ToolbarSpacer />
+        <Button text="{i18n>rfqSend}" type="Emphasized" icon="sap-icon://paper-plane" press=".onSubmit" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

@@ -1,11 +1,22 @@
 'use strict';
 /**
- * Módulo Compras: solicitação de compra + aprovação nativa (Procedimentos de Autorização do B1).
- * Rotas montadas em /api/m/compras
+ * Módulo Compras: ciclo completo em objetos nativos do B1.
+ *   Solicitação (OPRQ) -> Cotação online / Oferta de compra (OPQT) -> Pedido de compra (OPOR)
+ *   Contrato guarda-chuva (OOAT) consumido no pedido | Aprovação = Procedimentos de Autorização (OWDD)
+ * Rotas montadas em /api/m/compras ; página pública do fornecedor em /api/public/compras
+ *
+ * Telas de comprador (tiles "buyer"): liberadas por tenants.json > moduleAccess.compras.buyers
+ * { "departments": [..], "users": [..] }. Sem essa regra, quem acessa Compras vê tudo.
  */
 const express = require('express');
 const attachments = require('../../core/attachments');
 const notify = require('../../core/notify');
+const access = require('../../core/access');
+const { createService } = require('./rfq');
+
+const adapter = (mock) => (mock ? require('./mock') : { ...require('./sl'), ...require('./sl-procure') });
+const KIND_OK = ['pr', 'pq', 'po'];
+const today = () => new Date().toISOString().slice(0, 10);
 
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s)) && !isNaN(Date.parse(s));
 
@@ -26,19 +37,91 @@ function validateRequest(p) {
   return errors;
 }
 
+function validateOrder(p) {
+  const e = [];
+  if (!p || typeof p !== 'object') return ['Payload inválido'];
+  if (!p.cardCode) e.push('Informe o fornecedor');
+  if (!isDate(p.dueDate)) e.push('Data de entrega inválida');
+  else if (p.dueDate < today()) e.push('Data de entrega no passado');
+  if (!Array.isArray(p.lines) || !p.lines.length) e.push('Inclua ao menos um item');
+  else if (p.lines.length > 100) e.push('Máximo de 100 itens por pedido');
+  else p.lines.forEach((l, i) => {
+    if (!l.itemCode) e.push(`Linha ${i + 1}: item obrigatório`);
+    if (!(Number(l.quantity) > 0)) e.push(`Linha ${i + 1}: quantidade deve ser maior que zero`);
+    if (l.unitPrice !== undefined && l.unitPrice !== null && l.unitPrice !== '' && !(Number(l.unitPrice) >= 0)) e.push(`Linha ${i + 1}: preço inválido`);
+    if (l.shipDate && !isDate(l.shipDate)) e.push(`Linha ${i + 1}: data de entrega inválida`);
+    if (l.agreementNo && !/^\d+$/.test(String(l.agreementNo))) e.push(`Linha ${i + 1}: contrato inválido`);
+  });
+  if (p.comments && String(p.comments).length > 254) e.push('Observações: máximo 254 caracteres');
+  return e;
+}
+
+function validateAgreement(p) {
+  const e = [];
+  if (!p || typeof p !== 'object') return ['Payload inválido'];
+  if (!p.cardCode) e.push('Informe o fornecedor');
+  if (!isDate(p.startDate) || !isDate(p.endDate)) e.push('Informe início e fim do contrato');
+  else if (p.endDate < p.startDate) e.push('Fim do contrato antes do início');
+  if (!String(p.description || '').trim()) e.push('Informe a descrição do contrato');
+  if (!['item', 'monetary'].includes(p.method)) e.push('Método do contrato inválido');
+  if (!Array.isArray(p.lines) || !p.lines.length) e.push('Inclua ao menos uma linha');
+  else p.lines.forEach((l, i) => {
+    if (p.method === 'monetary') {
+      if (!(Number(l.plannedAmount) > 0)) e.push(`Linha ${i + 1}: valor planejado inválido`);
+    } else {
+      if (!l.itemCode) e.push(`Linha ${i + 1}: item obrigatório`);
+      if (!(Number(l.plannedQty) > 0)) e.push(`Linha ${i + 1}: quantidade planejada inválida`);
+      if (!(Number(l.unitPrice) >= 0)) e.push(`Linha ${i + 1}: preço inválido`);
+    }
+  });
+  return e;
+}
+
 module.exports = {
   id: 'compras',
   title: 'Compras',
-  description: 'Solicitação de compra e aprovação',
+  description: 'Solicitação, cotação, pedido, contratos e aprovação',
   tiles: [
     { id: 'new', title: 'Nova solicitação', subtitle: 'Solicitar materiais e serviços', icon: 'sap-icon://cart-4', route: 'compras.new' },
-    { id: 'mine', title: 'Minhas solicitações', subtitle: 'Acompanhe o status', icon: 'sap-icon://my-sales-order', route: 'compras.mine', counter: true },
-    { id: 'approvals', title: 'Aprovações pendentes', subtitle: 'Aguardando sua decisão', icon: 'sap-icon://approvals', route: 'compras.approvals', counter: true, critical: true }
+    { id: 'mine', title: 'Solicitações de compra', subtitle: 'Minhas solicitações', icon: 'sap-icon://my-sales-order', route: 'compras.mine', counter: true },
+    { id: 'rfq', title: 'Cotações online', subtitle: 'Fornecedores respondem pela web', icon: 'sap-icon://compare', route: 'compras.rfqs', counter: true, buyer: true },
+    { id: 'offers', title: 'Ofertas de compra', subtitle: 'Propostas dos fornecedores', icon: 'sap-icon://sales-quote', route: 'compras.offers', buyer: true },
+    { id: 'orders', title: 'Pedidos de compra', subtitle: 'Emitir e acompanhar', icon: 'sap-icon://sales-order', route: 'compras.orders', counter: true, buyer: true },
+    { id: 'contracts', title: 'Contratos guarda-chuva', subtitle: 'Acordos com fornecedores', icon: 'sap-icon://umbrella', route: 'compras.contracts', buyer: true },
+    { id: 'approvals', title: 'Aprovações de compras', subtitle: 'Aguardando sua decisão', icon: 'sap-icon://approvals', route: 'compras.approvals', counter: true, critical: true }
   ],
 
-  createRouter({ mock, wrap, audit }) {
-    const b1 = mock ? require('./mock') : require('./sl');
+  createPublicRouter({ mock, wrap, tenantById }) {
+    const rfq = createService({ b1: adapter(mock), tenantById });
     const r = express.Router();
+    const hits = new Map();
+    r.use((req, res, next) => { // limite por IP: 60 chamadas / 5 min
+      const now = Date.now();
+      const h = (hits.get(req.ip) || []).filter((t) => now - t < 300000);
+      if (h.length >= 60) return res.status(429).json({ error: 'Muitas requisições. Aguarde alguns minutos.' });
+      h.push(now);
+      hits.set(req.ip, h);
+      next();
+    });
+    r.get('/cotacao/:token', wrap(async (req, res) => {
+      const out = rfq.publicGet(req.params.token);
+      if (!out) return res.status(404).json({ error: 'Link inválido ou expirado. Fale com o comprador.' });
+      res.json({ ...out.data, branding: require('../../core/branding').forTenant(out.tenant || {}) });
+    }));
+    r.post('/cotacao/:token', wrap(async (req, res) => {
+      const out = await rfq.publicSubmit(req, req.params.token, req.body || {});
+      if (!out) return res.status(404).json({ error: 'Link inválido ou expirado. Fale com o comprador.' });
+      res.json(out);
+    }));
+    return r;
+  },
+
+  createRouter({ mock, wrap, audit, tenantById }) {
+    const b1 = adapter(mock);
+    const rfq = createService({ b1, tenantById });
+    const r = express.Router();
+    const buyerOnly = (req, res, next) => (access.canTile(req.tenant, req.session.user, 'compras', { buyer: true })
+      ? next() : res.status(403).json({ error: 'Função exclusiva de compradores' }));
     const cache = new Map();
     const cached = async (key, ttl, fn) => {
       const hit = cache.get(key);
@@ -56,14 +139,19 @@ module.exports = {
       const key = `${req.tenant.id}:${req.session.user.userCode}`;
       const hit = counterCache.get(key);
       if (hit && Date.now() - hit.at < 30000) return res.json(hit.value);
-      const [mine, approvals] = await Promise.allSettled([
+      const buyer = access.canTile(req.tenant, req.session.user, 'compras', { buyer: true });
+      const [mine, approvals, rfqs, orders] = await Promise.allSettled([
         b1.countMyRequests(req.tenant, req.session.ctx, req.session.user),
-        b1.countPendingApprovals(req.tenant, req.session.ctx, req.session.user)
+        b1.countPendingApprovals(req.tenant, req.session.ctx, req.session.user),
+        buyer ? Promise.resolve(rfq.list(req).filter((x) => x.status === 'OPEN' || x.status === 'EXPIRED' || x.pendingSync).length) : Promise.resolve(undefined),
+        buyer ? b1.listDocs(req.tenant, req.session.ctx, req.session.user, 'po', { status: 'open' }).then((a) => a.length) : Promise.resolve(undefined)
       ]);
-      [mine, approvals].forEach((x) => { if (x.status === 'rejected') console.error('[compras] contador falhou:', x.reason && x.reason.message); });
+      [mine, approvals, rfqs, orders].forEach((x) => { if (x.status === 'rejected') console.error('[compras] contador falhou:', x.reason && x.reason.message); });
       const out = {};
       if (mine.status === 'fulfilled') out.mine = mine.value;
       if (approvals.status === 'fulfilled') out.approvals = approvals.value;
+      if (rfqs.status === 'fulfilled' && rfqs.value !== undefined) out.rfq = rfqs.value;
+      if (orders.status === 'fulfilled' && orders.value !== undefined) out.orders = orders.value;
       counterCache.set(key, { at: Date.now(), value: out });
       res.json(out);
     }));
@@ -75,6 +163,9 @@ module.exports = {
     }));
     r.get('/vendors', wrap(async (req, res) => {
       res.json(await b1.searchVendors(req.tenant, req.session.ctx, String(req.query.q || '').slice(0, 50)));
+    }));
+    r.get('/vendors/:cardCode/contact', buyerOnly, wrap(async (req, res) => {
+      res.json(await b1.vendorContact(req.tenant, req.session.ctx, String(req.params.cardCode).slice(0, 50)));
     }));
     r.get('/cost-centers', wrap(async (req, res) => {
       res.json(await cached(`cc:${req.tenant.id}`, 600000, () => b1.listCostCenters(req.tenant, req.session.ctx)));
@@ -136,6 +227,142 @@ module.exports = {
       const out = await b1.finalizeDraft(req.tenant, req.session.ctx, Number(req.params.entry));
       audit(req, 'PR_FINALIZE', { draftEntry: Number(req.params.entry) });
       notify.generated(req, b1, Number(req.params.entry));
+      res.json(out);
+    }));
+
+    // ---------- Documentos genéricos (solicitação, oferta, pedido) ----------
+    const docParams = (req, res) => {
+      const { kind, source, entry } = req.params;
+      if (!KIND_OK.includes(kind) || !['doc', 'draft'].includes(source) || !/^\d+$/.test(entry)) {
+        res.status(400).json({ error: 'Parâmetros inválidos' });
+        return null;
+      }
+      // Oferta/pedido efetivados: só comprador. Rascunho: quem aprova ou quem criou (checado no B1).
+      if (kind !== 'pr' && source === 'doc' && !access.canTile(req.tenant, req.session.user, 'compras', { buyer: true })) {
+        res.status(403).json({ error: 'Função exclusiva de compradores' });
+        return null;
+      }
+      return { kind, source, entry: Number(entry) };
+    };
+
+    r.get('/docs/:kind/:source/:entry', wrap(async (req, res) => {
+      const p = docParams(req, res);
+      if (!p) return;
+      const doc = await b1.getRequest(req.tenant, req.session.ctx, p.source, p.entry, p.kind);
+      doc.attachments = await attachments.list(req.tenant, req.session.ctx, doc.attachmentEntry, mock);
+      res.json(doc);
+    }));
+
+    r.get('/docs/:kind/:source/:entry/attachments/:line', wrap(async (req, res) => {
+      const p = docParams(req, res);
+      if (!p) return;
+      if (!/^\d+$/.test(req.params.line)) return res.status(400).json({ error: 'Parâmetros inválidos' });
+      const doc = await b1.getRequest(req.tenant, req.session.ctx, p.source, p.entry, p.kind);
+      if (!doc.attachmentEntry) return res.status(404).json({ error: 'Documento sem anexos' });
+      attachments.send(res, await attachments.download(req.tenant, req.session.ctx, doc.attachmentEntry, req.params.line, mock));
+    }));
+
+    r.post('/docs/:kind/draft/:entry/finalize', wrap(async (req, res) => {
+      if (!KIND_OK.includes(req.params.kind) || !/^\d+$/.test(req.params.entry)) return res.status(400).json({ error: 'Parâmetro inválido' });
+      const entry = Number(req.params.entry);
+      const draft = await b1.getRequest(req.tenant, req.session.ctx, 'draft', entry, req.params.kind);
+      const u = req.session.user;
+      const mineDoc = draft.requester === u.userCode || (draft.approval && Number(draft.approval.originatorId) === Number(u.internalKey));
+      if (!mineDoc) return res.status(403).json({ error: 'Somente quem criou o documento pode efetivar' });
+      if (draft.status !== 'APPROVED') return res.status(400).json({ error: 'Documento ainda não aprovado' });
+      const out = await b1.finalizeDraft(req.tenant, req.session.ctx, entry);
+      audit(req, `${draft.kind.toUpperCase()}_FINALIZE`, { draftEntry: entry });
+      notify.generated(req, b1, entry);
+      res.json(out);
+    }));
+
+    // ---------- Ofertas e pedidos ----------
+    const listStatus = (s) => (['open', 'closed', 'all'].includes(s) ? s : 'open');
+    r.get('/offers', buyerOnly, wrap(async (req, res) => {
+      res.json(await b1.listDocs(req.tenant, req.session.ctx, req.session.user, 'pq', { status: listStatus(req.query.status), cardCode: req.query.cardCode }));
+    }));
+    r.get('/orders', buyerOnly, wrap(async (req, res) => {
+      res.json(await b1.listDocs(req.tenant, req.session.ctx, req.session.user, 'po', { status: listStatus(req.query.status), cardCode: req.query.cardCode }));
+    }));
+
+    r.post('/orders', buyerOnly, wrap(async (req, res) => {
+      const errors = validateOrder(req.body);
+      const branches = await cached(`bpl:${req.tenant.id}:${req.session.user.userCode}`, 600000,
+        () => b1.listBranches(req.tenant, req.session.ctx, req.session.user));
+      if (branches.length && !branches.some((b) => String(b.id) === String(req.body && req.body.branch))) errors.push('Selecione a filial');
+      if (errors.length) return res.status(400).json({ error: errors.join('; '), errors });
+      const att = attachments.parse(req.body.attachments);
+      if (att.errors.length) return res.status(400).json({ error: att.errors.join('; ') });
+      const attachmentEntry = await attachments.upload(req.tenant, req.session.ctx, att.files, mock);
+      const result = await b1.createPurchaseOrder(req.tenant, req.session.ctx, req.session.user,
+        { ...req.body, attachments: undefined, attachmentEntry });
+      audit(req, 'PO_CREATE', result);
+      if (result.source === 'draft') notify.approvalRequested(req, b1, result.entry);
+      res.status(201).json(result);
+    }));
+
+    // ---------- Contratos guarda-chuva ----------
+    r.get('/agreements', wrap(async (req, res) => {
+      res.json(await b1.listAgreements(req.tenant, req.session.ctx, { cardCode: req.query.cardCode, activeOnly: req.query.active === '1' }));
+    }));
+    r.get('/agreements/:no', buyerOnly, wrap(async (req, res) => {
+      if (!/^\d+$/.test(req.params.no)) return res.status(400).json({ error: 'Parâmetro inválido' });
+      res.json(await b1.getAgreement(req.tenant, req.session.ctx, Number(req.params.no)));
+    }));
+    r.post('/agreements', buyerOnly, wrap(async (req, res) => {
+      const errors = validateAgreement(req.body);
+      if (errors.length) return res.status(400).json({ error: errors.join('; '), errors });
+      const out = await b1.createAgreement(req.tenant, req.session.ctx, req.body);
+      audit(req, 'AGREEMENT_CREATE', out);
+      res.status(201).json(out);
+    }));
+    r.post('/agreements/:no/status', buyerOnly, wrap(async (req, res) => {
+      const st = String((req.body || {}).status || '');
+      if (!/^\d+$/.test(req.params.no) || !['ACTIVE', 'ONHOLD', 'TERMINATED', 'CANCELLED'].includes(st)) return res.status(400).json({ error: 'Parâmetros inválidos' });
+      await b1.setAgreementStatus(req.tenant, req.session.ctx, Number(req.params.no), st);
+      audit(req, 'AGREEMENT_STATUS', { agreementNo: Number(req.params.no), status: st });
+      res.json(await b1.getAgreement(req.tenant, req.session.ctx, Number(req.params.no)));
+    }));
+
+    // ---------- Cotação online ----------
+    const idOk = (req, res) => (/^\d+$/.test(req.params.id) ? true : (res.status(400).json({ error: 'Parâmetro inválido' }), false));
+    r.get('/rfq', buyerOnly, wrap(async (req, res) => res.json(rfq.list(req))));
+    r.get('/rfq/sources', buyerOnly, wrap(async (req, res) => res.json(await rfq.sources(req, req.query.branch || null))));
+    r.post('/rfq', buyerOnly, wrap(async (req, res) => {
+      const out = await rfq.create(req, req.body);
+      audit(req, 'RFQ_CREATE', { id: out.id, suppliers: out.suppliers.map((s) => s.cardCode) });
+      res.status(201).json(out);
+    }));
+    r.get('/rfq/:id', buyerOnly, wrap(async (req, res) => { if (idOk(req, res)) res.json(rfq.get(req, req.params.id)); }));
+    r.post('/rfq/:id/sync', buyerOnly, wrap(async (req, res) => { if (idOk(req, res)) res.json(await rfq.sync(req, req.params.id)); }));
+    r.post('/rfq/:id/suppliers', buyerOnly, wrap(async (req, res) => {
+      if (!idOk(req, res)) return;
+      const { cardCode, email } = req.body || {};
+      if (!cardCode) return res.status(400).json({ error: 'Informe o fornecedor' });
+      res.json(await rfq.addSupplier(req, req.params.id, String(cardCode), email));
+    }));
+    r.post('/rfq/:id/suppliers/:cardCode/resend', buyerOnly, wrap(async (req, res) => {
+      if (idOk(req, res)) res.json(await rfq.resend(req, req.params.id, req.params.cardCode, req.body || {}));
+    }));
+    r.post('/rfq/:id/suppliers/:cardCode/answer', buyerOnly, wrap(async (req, res) => {
+      if (!idOk(req, res)) return;
+      const out = await rfq.buyerAnswer(req, req.params.id, req.params.cardCode, req.body);
+      audit(req, 'RFQ_BUYER_ANSWER', { id: Number(req.params.id), cardCode: req.params.cardCode });
+      res.json(out);
+    }));
+    r.post('/rfq/:id/close', buyerOnly, wrap(async (req, res) => { if (idOk(req, res)) res.json(await rfq.close(req, req.params.id)); }));
+    r.post('/rfq/:id/reopen', buyerOnly, wrap(async (req, res) => { if (idOk(req, res)) res.json(await rfq.reopen(req, req.params.id, (req.body || {}).deadline)); }));
+    r.post('/rfq/:id/cancel', buyerOnly, wrap(async (req, res) => {
+      if (!idOk(req, res)) return;
+      const out = await rfq.cancel(req, req.params.id);
+      audit(req, 'RFQ_CANCEL', { id: Number(req.params.id) });
+      res.json(out);
+    }));
+    r.post('/rfq/:id/award', buyerOnly, wrap(async (req, res) => {
+      if (!idOk(req, res)) return;
+      const out = await rfq.award(req, req.params.id, req.body || {});
+      audit(req, 'RFQ_AWARD', { id: out.id, orders: out.award.orders });
+      out.award.orders.filter((o) => o.source === 'draft').forEach((o) => notify.approvalRequested(req, b1, o.entry));
       res.json(out);
     }));
 

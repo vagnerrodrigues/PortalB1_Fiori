@@ -1,0 +1,28 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Rfqs"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>rfqListTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh" />
+      <Button icon="sap-icon://add" text="{i18n>rfqNew}" type="Emphasized" press=".onNew" />
+    </headerContent>
+    <subHeader>
+      <OverflowToolbar>
+        <SearchField liveChange=".onSearch" width="100%" placeholder="{i18n>search}" />
+      </OverflowToolbar>
+    </subHeader>
+    <List id="list" items="{list>/}" noDataText="{i18n>noData}" growing="true" growingThreshold="30">
+      <ObjectListItem title="{parts: [{value: 'rfqTitle'}, 'list>id'], formatter: '.formatter.txt'} · {list>title}" type="Navigation" press=".onOpen"
+        number="{list>answered}/{list>invited}" numberUnit="{i18n>rfqQuoted}">
+        <firstStatus>
+          <ObjectStatus text="{parts: [{value: 'rfqSt_'}, 'list>status'], formatter: '.formatter.prefixed'}"
+            state="{path: 'list>status', formatter: '.formatter.rfqState'}" />
+        </firstStatus>
+        <secondStatus>
+          <ObjectStatus text="{parts: [{value: 'rfqPendingSync'}, 'list>pendingSync'], formatter: '.formatter.txt'}" state="Warning" visible="{= ${list>pendingSync} > 0 }" />
+        </secondStatus>
+        <ObjectAttribute text="{i18n>rfqDeadline}: {path: 'list>deadline', formatter: '.formatter.date'} · {list>lines} {i18n>items}" />
+        <ObjectAttribute text="{parts: [{value: 'rfqFrom'}, 'list>createdBy'], formatter: '.formatter.txt'}" />
+      </ObjectListItem>
+    </List>
+  </Page>
+</mvc:View>

@@ -1,0 +1,96 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.OrderNew"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.ui.layout.form" xmlns:core="sap.ui.core"
+  core:require="{ Float: 'sap/ui/model/type/Float' }">
+  <Page title="{i18n>orderNewTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3" columnsL="1" columnsM="1">
+        <Label text="{i18n>supplier}" required="true" />
+        <Input id="vendor" value="{po>/cardLabel}" showSuggestion="true" filterSuggests="false" startSuggestion="2" width="28rem"
+          suggest=".onVendorSuggest" suggestionItemSelected=".onVendorSelected" liveChange=".onVendorTyped"
+          valueState="{= ${po>/cardLabel} &amp;&amp; !${po>/cardCode} ? 'Warning' : 'None'}"
+          suggestionItems="{path: 'md>/vendorSuggest', templateShareable: true}">
+          <suggestionItems>
+            <core:ListItem key="{md>cardCode}" text="{md>cardCode} - {md>cardName}" />
+          </suggestionItems>
+        </Input>
+        <Label text="{i18n>branch}" required="true" visible="{= ${md>/branches}.length > 0 }" />
+        <ComboBox selectedKey="{po>/branch}" items="{md>/branches}" width="22rem" visible="{= ${md>/branches}.length > 0 }" selectionChange=".onBranchChange">
+          <core:Item key="{md>id}" text="{md>name}" />
+        </ComboBox>
+        <Label text="{i18n>orderDue}" required="true" />
+        <DatePicker value="{po>/dueDate}" valueFormat="yyyy-MM-dd" displayFormat="medium" minDate="{po>/minDate}" width="14rem" />
+        <Label text="{i18n>orderAgreement}" visible="{= ${md>/agreements}.length > 0 }" />
+        <HBox visible="{= ${md>/agreements}.length > 0 }" alignItems="Center" wrap="Wrap">
+          <Select selectedKey="{po>/agreementNo}" items="{md>/agreementItems}" width="22rem" change=".onAgreementChange">
+            <core:Item key="{md>key}" text="{md>text}" />
+          </Select>
+          <Button text="{i18n>orderLoadAgreement}" icon="sap-icon://download" press=".onLoadAgreement" enabled="{= !!${po>/agreementNo} }" class="sapUiSmallMarginBegin" />
+        </HBox>
+        <Label text="{i18n>numAtCard}" />
+        <Input value="{po>/numAtCard}" maxLength="100" width="22rem" />
+        <Label text="{i18n>comments}" />
+        <TextArea value="{po>/comments}" maxLength="254" rows="2" growing="true" />
+      </f:SimpleForm>
+      <MessageStrip text="{i18n>orderAgreementHint}" type="Information" showIcon="true" class="sapUiSmallMarginBeginEnd"
+        visible="{= !!${po>/agreementNo} }" />
+
+      <Table items="{po>/lines}" noDataText="{i18n>noLines}" class="sapUiResponsiveContentPadding">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{i18n>items} ({= ${po>/lines}.length})" />
+            <ToolbarSpacer />
+            <Button text="{i18n>addItem}" icon="sap-icon://add" press=".onAddLine" />
+          </OverflowToolbar>
+        </headerToolbar>
+        <columns>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column width="7rem" hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>quantity}" /></Column>
+          <Column width="4rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>uom}" /></Column>
+          <Column width="9rem" hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>orderPrice}" /></Column>
+          <Column width="10rem" minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>shipDate}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>costCenter}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>warehouse}" /></Column>
+          <Column width="3rem" />
+        </columns>
+        <items>
+          <ColumnListItem>
+            <VBox>
+              <Input value="{po>itemLabel}" showSuggestion="true" filterSuggests="false" startSuggestion="2"
+                suggest=".onItemSuggest" suggestionItemSelected=".onItemSelected" liveChange=".onItemTyped"
+                valueState="{= ${po>itemLabel} &amp;&amp; !${po>itemCode} ? 'Warning' : 'None'}"
+                suggestionItems="{path: 'md>/itemSuggest', templateShareable: true}">
+                <suggestionItems>
+                  <core:ListItem key="{md>itemCode}" text="{md>itemCode} - {md>itemName}" additionalText="{md>uom}" />
+                </suggestionItems>
+              </Input>
+              <ObjectStatus text="{i18n>agreement} {po>agreementNo} · {i18n>contractOpenQty}: {po>agreementOpen}" state="Information"
+                icon="sap-icon://umbrella" visible="{= !!${po>agreementNo} }" />
+            </VBox>
+            <Input value="{path: 'po>quantity', type: 'Float', formatOptions: {minFractionDigits: 0, maxFractionDigits: 3}}" textAlign="End" liveChange=".onRecalc" change=".onRecalc" />
+            <Text text="{po>uom}" />
+            <Input value="{path: 'po>unitPrice', type: 'Float', formatOptions: {minFractionDigits: 2, maxFractionDigits: 4}}" textAlign="End" change=".onRecalc"
+              editable="{= !${po>agreementNo} }" />
+            <DatePicker value="{po>shipDate}" valueFormat="yyyy-MM-dd" displayFormat="short" />
+            <ComboBox selectedKey="{po>costCenter}" items="{path: 'md>/costCenters', templateShareable: true}" width="100%">
+              <core:Item key="{md>code}" text="{md>name}" />
+            </ComboBox>
+            <ComboBox selectedKey="{po>warehouse}" items="{path: 'md>/whFiltered', templateShareable: true}" width="100%">
+              <core:Item key="{md>code}" text="{md>name}" />
+            </ComboBox>
+            <Button icon="sap-icon://delete" type="Transparent" press=".onRemoveLine" />
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <core:Fragment fragmentName="portal.b1.view.fragments.AttachmentsPicker" type="XML" />
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <Text text="{i18n>orderTotal}:" />
+        <ObjectNumber number="{path: 'po>/total', formatter: '.formatter.money'}" class="pcTotal" />
+        <ToolbarSpacer />
+        <Button text="{i18n>orderSubmit}" type="Emphasized" icon="sap-icon://paper-plane" press=".onSubmit" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

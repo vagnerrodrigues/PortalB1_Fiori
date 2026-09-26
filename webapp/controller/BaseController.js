@@ -101,6 +101,44 @@ sap.ui.define([
 
     toast: function (sMsg) { MessageToast.show(sMsg); },
 
+    // ---------- Compras: navegação e buscas compartilhadas ----------
+    KIND_SLUG: { pr: "solicitacao", pq: "oferta", po: "pedido" },
+    SLUG_KIND: { solicitacao: "pr", oferta: "pq", pedido: "po" },
+
+    /** Abre o detalhe de um documento de compras (solicitação, oferta ou pedido). */
+    navToDoc: function (sKind, sSource, vEntry, oQuery, bReplace) {
+      var oArgs = { kind: this.KIND_SLUG[sKind] || "solicitacao", source: sSource, entry: vEntry };
+      if (oQuery) { oArgs["?query"] = oQuery; }
+      this.getRouter().navTo("compras.detail", oArgs, bReplace);
+    },
+
+    /** Busca com atraso (digitação) e grava o resultado em oModel>sPath. */
+    suggest: function (sUrl, oModel, sPath) {
+      this._suggestTimers = this._suggestTimers || {};
+      clearTimeout(this._suggestTimers[sPath]);
+      this._suggestTimers[sPath] = setTimeout(function () {
+        api.get(sUrl).then(function (a) { oModel.setProperty(sPath, a); }).catch(function () {});
+      }, 250);
+    },
+
+    isoDate: function (d) {
+      return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    },
+
+    copyText: function (sText) {
+      var fnFallback = function () {
+        var el = document.createElement("textarea");
+        el.value = sText;
+        document.body.appendChild(el);
+        el.select();
+        try { document.execCommand("copy"); } catch (e) { /* sem suporte */ }
+        document.body.removeChild(el);
+        return Promise.resolve();
+      };
+      return (navigator.clipboard && window.isSecureContext ? navigator.clipboard.writeText(sText) : fnFallback())
+        .catch(fnFallback);
+    },
+
     onLogout: function () {
       api.post("/api/logout").finally(function () {
         this.getModel("session").setProperty("/loggedIn", false);

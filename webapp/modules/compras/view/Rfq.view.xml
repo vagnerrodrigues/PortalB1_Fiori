@@ -1,0 +1,127 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Rfq"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core">
+  <Page title="{parts: [{value: 'rfqTitle'}, 'rfq>/id'], formatter: '.formatter.txt'}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh" />
+    </headerContent>
+    <content>
+      <ObjectHeader title="{rfq>/title}" responsive="true" backgroundDesign="Transparent"
+        number="{path: 'view>/selected', formatter: '.formatter.money'}" numberUnit="{i18n>rfqSelected}">
+        <statuses>
+          <ObjectStatus text="{parts: [{value: 'rfqSt_'}, 'rfq>/status'], formatter: '.formatter.prefixed'}"
+            state="{path: 'rfq>/status', formatter: '.formatter.rfqState'}" />
+          <ObjectStatus text="{parts: [{value: 'rfqAnswered'}, 'rfq>/map/summary/answered', 'rfq>/map/summary/invited'], formatter: '.formatter.txt'}" />
+        </statuses>
+        <ObjectAttribute title="{i18n>rfqDeadline}" text="{path: 'rfq>/deadline', formatter: '.formatter.date'}" />
+        <ObjectAttribute title="{i18n>requester}" text="{rfq>/createdBy/userName}" />
+        <ObjectAttribute title="{i18n>rfqMessage}" text="{rfq>/message}" visible="{= !!${rfq>/message} }" />
+      </ObjectHeader>
+
+      <MessageStrip text="{view>/syncErrors}" type="Error" showIcon="true" class="sapUiSmallMarginBeginEnd sapUiSmallMarginBottom"
+        visible="{= !!${view>/syncErrors} }" />
+
+      <IconTabBar id="tabs" selectedKey="{view>/tab}" expandable="false" headerMode="Inline" class="sapUiResponsiveContentPadding" headerBackgroundDesign="Transparent">
+        <items>
+          <IconTabFilter key="map" text="{i18n>rfqMap}">
+            <FlexBox wrap="Wrap" class="sapUiSmallMarginBottom">
+              <VBox class="pbKpi">
+                <Label text="{i18n>rfqBestMix}" />
+                <ObjectNumber number="{path: 'rfq>/map/summary/bestMix', formatter: '.formatter.money'}" class="pbKpiValue" />
+              </VBox>
+              <VBox class="pbKpi">
+                <Label text="{i18n>rfqBestSingle}" />
+                <ObjectNumber number="{path: 'rfq>/map/summary/bestSingle/total', formatter: '.formatter.money'}" class="pbKpiValue" />
+                <Text text="{view>/bestSingleName}" />
+              </VBox>
+              <VBox class="pbKpi" visible="{= ${rfq>/map/summary/savingVsSingle} > 0 }">
+                <Label text="{i18n>rfqSaving}" />
+                <ObjectNumber number="{path: 'rfq>/map/summary/savingVsSingle', formatter: '.formatter.money'}" state="Success" class="pbKpiValue" />
+              </VBox>
+              <VBox class="pbKpi pbKpiMain">
+                <Label text="{i18n>rfqSelected}" />
+                <ObjectNumber number="{path: 'view>/selected', formatter: '.formatter.money'}" class="pbKpiValue" />
+                <Text text="{view>/selectedInfo}" />
+              </VBox>
+            </FlexBox>
+            <VBox id="mapBox" />
+          </IconTabFilter>
+
+          <IconTabFilter key="suppliers" text="{i18n>rfqSuppliers}" count="{= ${rfq>/suppliers}.length }">
+            <Table items="{rfq>/suppliers}" noDataText="{i18n>noData}">
+              <headerToolbar>
+                <OverflowToolbar>
+                  <ToolbarSpacer />
+                  <Input id="supplierInput" width="22rem" placeholder="{i18n>rfqAddSupplier}" showSuggestion="true" filterSuggests="false"
+                    startSuggestion="2" suggest=".onSupplierSuggest" suggestionItemSelected=".onSupplierPick"
+                    visible="{= ${rfq>/status} === 'OPEN' }" suggestionItems="{path: 'md>/vendorSuggest', templateShareable: true}">
+                    <suggestionItems>
+                      <core:ListItem key="{md>cardCode}" text="{md>cardCode} - {md>cardName}" />
+                    </suggestionItems>
+                  </Input>
+                </OverflowToolbar>
+              </headerToolbar>
+              <columns>
+                <Column><Text text="{i18n>supplier}" /></Column>
+                <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>rfqEmail}" /></Column>
+                <Column><Text text="{i18n>rfqStatus}" /></Column>
+                <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>kind_pq}" /></Column>
+                <Column hAlign="End" width="10rem"><Text text="" /></Column>
+              </columns>
+              <items>
+                <ColumnListItem>
+                  <ObjectIdentifier title="{rfq>cardName}" text="{rfq>cardCode}" />
+                  <VBox>
+                    <Text text="{= ${rfq>email} || ${i18n>rfqNoEmail} }" />
+                    <ObjectStatus text="{= ${rfq>lastEmail} ? (${rfq>lastEmail/ok} ? '✓ ' : '✗ ' + ${rfq>lastEmail/info}) : '' }"
+                      state="{= ${rfq>lastEmail/ok} ? 'Success' : 'Error' }" visible="{= !!${rfq>lastEmail} }" />
+                  </VBox>
+                  <VBox>
+                    <ObjectStatus text="{parts: [{value: 'supSt_'}, 'rfq>status'], formatter: '.formatter.prefixed'}"
+                      state="{path: 'rfq>status', formatter: '.formatter.supplierState'}" />
+                    <Text text="{rfq>declineReason}{rfq>error}" visible="{= !!${rfq>declineReason} || !!${rfq>error} }" class="sapUiTinyMarginTop" />
+                    <ObjectStatus text="{parts: [{value: 'syncSt_'}, 'rfq>sync'], formatter: '.formatter.prefixed'}"
+                      state="{path: 'rfq>sync', formatter: '.formatter.syncState'}" visible="{= !!${rfq>sync} }" />
+                  </VBox>
+                  <Link text="N&#186; {rfq>pq/docNum}" press=".onOpenOffer" visible="{= !!${rfq>pq} }" />
+                  <HBox justifyContent="End">
+                    <Button icon="sap-icon://copy" tooltip="{i18n>rfqCopyLink}" type="Transparent" press=".onCopyLink" visible="{= !!${rfq>link} &amp;&amp; !!${rfq>pq} }" />
+                    <Button icon="sap-icon://email" tooltip="{i18n>rfqResend}" type="Transparent" press=".onResend"
+                      visible="{= !!${rfq>pq} &amp;&amp; ${rfq>/status} === 'OPEN' }" />
+                    <Button icon="sap-icon://edit" tooltip="{i18n>rfqEnterAnswer}" type="Transparent" press=".onEnterAnswer"
+                      visible="{= !!${rfq>pq} &amp;&amp; ${rfq>/status} !== 'AWARDED' &amp;&amp; ${rfq>/status} !== 'CANCELLED' }" />
+                  </HBox>
+                </ColumnListItem>
+              </items>
+            </Table>
+          </IconTabFilter>
+
+          <IconTabFilter key="orders" text="{i18n>rfqOrders}" visible="{= !!${rfq>/award} }"
+            count="{= ${rfq>/award/orders} ? ${rfq>/award/orders}.length : '' }">
+            <List items="{rfq>/award/orders}">
+              <ObjectListItem title="{parts: [{value: 'po'}, 'rfq>source', 'rfq>docNum', 'rfq>entry'], formatter: '.formatter.kindTitle'}"
+                number="{path: 'rfq>total', formatter: '.formatter.money'}" type="{= ${rfq>entry} ? 'Navigation' : 'Inactive' }" press=".onOpenOrder">
+                <firstStatus>
+                  <ObjectStatus text="{= ${rfq>error} || (${rfq>source} === 'draft' ? ${i18n>status_PENDING} : ${i18n>statusPo_OPEN}) }"
+                    state="{= ${rfq>error} ? 'Error' : (${rfq>source} === 'draft' ? 'Warning' : 'Success') }" />
+                </firstStatus>
+                <ObjectAttribute text="{rfq>cardName} · {rfq>lines} {i18n>items}" />
+              </ObjectListItem>
+            </List>
+          </IconTabFilter>
+        </items>
+      </IconTabBar>
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <Button text="{i18n>rfqCancel}" type="Reject" icon="sap-icon://decline" press=".onCancel"
+          visible="{= ${rfq>/status} !== 'AWARDED' &amp;&amp; ${rfq>/status} !== 'CANCELLED' }" />
+        <ToolbarSpacer />
+        <Button text="{i18n>rfqSync}" icon="sap-icon://synchronize" press=".onSync" visible="{= !!${view>/pendingSync} }" />
+        <Button text="{i18n>rfqClose}" icon="sap-icon://locked" press=".onClose" visible="{= ${rfq>/status} === 'OPEN' }" />
+        <Button text="{i18n>rfqReopen}" icon="sap-icon://unlocked" press=".onReopen" visible="{= ${rfq>/status} === 'CLOSED' || ${rfq>/status} === 'EXPIRED' }" />
+        <Button text="{i18n>rfqAward}" type="Emphasized" icon="sap-icon://sales-order" press=".onAward"
+          visible="{= ${rfq>/status} !== 'AWARDED' &amp;&amp; ${rfq>/status} !== 'CANCELLED' }" enabled="{= ${view>/winners} > 0 }" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

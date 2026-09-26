@@ -14,6 +14,20 @@ const sl = require('../../core/slClient');
 
 const OBJ_PURCHASE_REQUEST = '1470000113';
 
+/**
+ * Documentos de compras tratados pelo portal (todos nativos):
+ *  pr = Solicitação de compra (OPRQ) | pq = Oferta de compra (OPQT) | po = Pedido de compra (OPOR)
+ * draftCode = valor de DocObjectCode no rascunho (ODRF) quando o Procedimento de Autorização retém o documento.
+ */
+const KINDS = {
+  pr: { obj: '1470000113', coll: 'PurchaseRequests', draftCode: 'oPurchaseRequest' },
+  pq: { obj: '540000006', coll: 'PurchaseQuotations', draftCode: 'oPurchaseQuotations' },
+  po: { obj: '22', coll: 'PurchaseOrders', draftCode: 'oPurchaseOrders' }
+};
+const ALL_OBJ = Object.values(KINDS).map((k) => k.obj);
+const kindByObj = (code) => Object.keys(KINDS).find((k) => KINDS[k].obj === String(code)) || null;
+const kindByDraftCode = (code) => Object.keys(KINDS).find((k) => KINDS[k].draftCode === code) || null;
+
 const q = (s) => String(s || '').replace(/'/g, "''"); // escape OData string
 const enc = encodeURIComponent;
 
@@ -80,13 +94,13 @@ async function listBranches(tenant, ctx, user) {
 
 /** Série de numeração da Solicitação de compra vinculada à filial (OB1 multi-filial). */
 const seriesCache = new Map();
-async function seriesForBranch(tenant, ctx, branchId) {
-  const key = tenant.id;
+async function seriesForBranch(tenant, ctx, branchId, kind = 'pr') {
+  const key = `${tenant.id}:${kind}`;
   let list = seriesCache.get(key);
   if (!list) {
     try {
       const r = await sl.request(tenant, ctx.cookie, 'POST', '/SeriesService_GetDocumentSeries',
-        { DocumentTypeParams: { Document: OBJ_PURCHASE_REQUEST } });
+        { DocumentTypeParams: { Document: KINDS[kind].obj } });
       list = r.value || [];
     } catch (_) { list = []; }
     seriesCache.set(key, list);
@@ -150,15 +164,40 @@ function toSLPurchaseRequest(user, p, series) {
 }
 
 async function lastDraftEntry(tenant, ctx) {
-  const r = await sl.request(tenant, ctx.cookie, 'GET',
-    `/Drafts?$select=DocEntry&$filter=DocObjectCode eq 'oPurchaseRequest'&$orderby=DocEntry desc&$top=1`);
+  // ODRF é um só para todos os objetos: a maior chave vale como "foto" antes do POST
+  const r = await sl.request(tenant, ctx.cookie, 'GET', `/Drafts?$select=DocEntry&$orderby=DocEntry desc&$top=1`);
   return ((r.value || [])[0] || {}).DocEntry || 0;
 }
 
-async function draftsCreatedAfter(tenant, ctx, entry) {
+async function draftsCreatedAfter(tenant, ctx, entry, kind = 'pr') {
   const r = await sl.request(tenant, ctx.cookie, 'GET',
-    `/Drafts?$select=DocEntry,DocNum,Requester&$filter=DocObjectCode eq 'oPurchaseRequest' and DocEntry gt ${Number(entry)}&$orderby=DocEntry desc&$top=20`);
+    `/Drafts?$select=DocEntry,DocNum,Requester,CardCode&$filter=DocObjectCode eq '${KINDS[kind].draftCode}' and DocEntry gt ${Number(entry)}&$orderby=DocEntry desc&$top=20`);
   return r.value || [];
+}
+
+/**
+ * Cria um documento de compras (pr/pq/po). Se um Procedimento de Autorização se aplica, o B1 grava
+ * rascunho (ODRF) + pedido de aprovação (OWDD) e o SL responde com erro -2028 (validado no B1 10.0).
+ * match(draft) identifica o rascunho criado por este POST entre os rascunhos novos.
+ */
+async function createDocument(tenant, ctx, kind, body, match) {
+  const before = await lastDraftEntry(tenant, ctx);
+  let postError = null;
+  try {
+    const doc = await sl.request(tenant, ctx.cookie, 'POST', `/${KINDS[kind].coll}`, body);
+    if (doc && doc.DocEntry) return { kind, source: 'doc', entry: doc.DocEntry, docNum: doc.DocNum, status: 'OPEN' };
+  } catch (e) {
+    postError = e;
+  }
+  const created = await draftsCreatedAfter(tenant, ctx, before, kind);
+  const mine = created.find(match) || (created.length === 1 ? created[0] : null);
+  if (mine) return { kind, source: 'draft', entry: mine.DocEntry, docNum: mine.DocNum, status: 'PENDING' };
+  if (postError) {
+    console.error(`[compras] POST ${KINDS[kind].coll} recusado:`, postError.message,
+      JSON.stringify({ ...body, RequesterEmail: body.RequesterEmail ? '***' : undefined }));
+    throw postError;
+  }
+  throw new sl.SLError(500, 'APPROVAL', 'O B1 não confirmou a criação do documento. Verifique no SAP antes de enviar de novo.');
 }
 
 /**
@@ -171,25 +210,7 @@ async function draftsCreatedAfter(tenant, ctx, entry) {
 async function createPurchaseRequest(tenant, ctx, user, payload) {
   const series = payload.branch ? await seriesForBranch(tenant, ctx, Number(payload.branch)) : undefined;
   const body = toSLPurchaseRequest(user, payload, series);
-  const before = await lastDraftEntry(tenant, ctx);
-  let postError = null;
-  try {
-    const doc = await sl.request(tenant, ctx.cookie, 'POST', '/PurchaseRequests', body);
-    if (doc && doc.DocEntry) {
-      return { source: 'doc', entry: doc.DocEntry, docNum: doc.DocNum, status: 'OPEN' };
-    }
-  } catch (e) {
-    postError = e;
-  }
-  const created = await draftsCreatedAfter(tenant, ctx, before);
-  const mine = created.find((d) => d.Requester === user.userCode) || (created.length === 1 ? created[0] : null);
-  if (mine) return { source: 'draft', entry: mine.DocEntry, docNum: mine.DocNum, status: 'PENDING' };
-  if (postError) {
-    // Registro técnico para diagnóstico (sem dados sensíveis): o que foi enviado e o que o B1 respondeu
-    console.error('[compras] POST PurchaseRequests recusado:', postError.message, JSON.stringify({ ...body, RequesterEmail: body.RequesterEmail ? '***' : undefined }));
-    throw postError;
-  }
-  throw new sl.SLError(500, 'APPROVAL', 'O B1 não confirmou a criação da solicitação. Verifique no SAP antes de enviar de novo.');
+  return createDocument(tenant, ctx, 'pr', body, (d) => d.Requester === user.userCode);
 }
 
 function mapApprovalStatus(s) {
@@ -226,13 +247,14 @@ const isDraftFlag = (v) => v === 'Y' || v === 'tYES' || v === true;
 const sqlQuery = require('../../core/sqlQuery');
 const DRAFT_HDR = {
   code: 'PB_DRAFT_HDR', name: 'Portal B1 - cabecalho de rascunho',
-  sql: 'SELECT T0."DocEntry", T0."DocNum", T0."DocType", T0."DocDate", T0."ReqDate", T0."DocTotal", T0."DocCur", T0."ReqName", T0."Requester", T0."Comments", T0."AtcEntry" ' +
+  sql: 'SELECT T0."DocEntry", T0."DocNum", T0."DocType", T0."DocDate", T0."ReqDate", T0."DocTotal", T0."DocCur", T0."ReqName", T0."Requester", T0."Comments", T0."AtcEntry", ' +
+       'T0."ObjType", T0."CardCode", T0."CardName", T0."DocDueDate", T0."NumAtCard" ' +
        'FROM "ODRF" T0 WHERE T0."DocEntry" = :entry'
 };
 const DRAFT_LINES = {
   code: 'PB_DRAFT_LIN', name: 'Portal B1 - linhas de rascunho',
   sql: 'SELECT T0."LineNum", T0."ItemCode", T0."Dscription", T0."Quantity", T0."unitMsr", T0."Price", T0."LineTotal", ' +
-       'T0."PQTReqDate", T0."OcrCode", T0."WhsCode", T0."LineVendor", T0."FreeTxt", T0."AcctCode" FROM "DRF1" T0 WHERE T0."DocEntry" = :entry ORDER BY T0."LineNum"'
+       'T0."PQTReqDate", T0."OcrCode", T0."WhsCode", T0."LineVendor", T0."FreeTxt", T0."AcctCode", T0."ShipDate", T0."AgrNo" FROM "DRF1" T0 WHERE T0."DocEntry" = :entry ORDER BY T0."LineNum"'
 };
 const warned = new Set();
 
@@ -245,7 +267,7 @@ const docTotal = (d) => (d.DocTotal !== undefined && d.DocTotal !== null)
 async function readDraft(tenant, ctx, entry, withLines) {
   try {
     return await sl.request(tenant, ctx.cookie, 'GET', withLines ? `/Drafts(${Number(entry)})`
-      : `/Drafts(${Number(entry)})?$select=DocEntry,DocNum,DocType,DocDate,RequriedDate,DocCurrency,Requester,RequesterName,Comments,AttachmentEntry,DocumentLines`);
+      : `/Drafts(${Number(entry)})?$select=DocEntry,DocNum,DocType,DocObjectCode,DocDate,DocDueDate,RequriedDate,DocCurrency,Requester,RequesterName,CardCode,CardName,Comments,AttachmentEntry,DocumentLines`);
   } catch (e) {
     if (!warned.has(tenant.id)) { warned.add(tenant.id); console.error(`[compras] leitura /Drafts(${entry}) recusada: ${e.message} — usando SQLQueries`); }
   }
@@ -257,10 +279,13 @@ async function readDraft(tenant, ctx, entry, withLines) {
       DocEntry: h.DocEntry, DocNum: h.DocNum, DocDate: h.DocDate, RequriedDate: h.ReqDate, DocTotal: h.DocTotal,
       DocCurrency: h.DocCur, Requester: h.Requester, RequesterName: h.ReqName, Comments: h.Comments,
       DocType: h.DocType === 'S' ? 'dDocument_Service' : 'dDocument_Items', AttachmentEntry: h.AtcEntry || null,
+      DocObjectCode: (KINDS[kindByObj(h.ObjType)] || {}).draftCode, CardCode: h.CardCode, CardName: h.CardName,
+      DocDueDate: h.DocDueDate, NumAtCard: h.NumAtCard,
       DocumentLines: lines.map((l) => ({
         LineNum: l.LineNum, ItemCode: l.ItemCode, ItemDescription: l.Dscription, Quantity: l.Quantity, MeasureUnit: l.unitMsr,
         UnitPrice: l.Price, LineTotal: l.LineTotal, RequiredDate: l.PQTReqDate, CostingCode: l.OcrCode,
-        WarehouseCode: l.WhsCode, LineVendor: l.LineVendor, FreeText: l.FreeTxt, AccountCode: l.AcctCode
+        WarehouseCode: l.WhsCode, LineVendor: l.LineVendor, FreeText: l.FreeTxt, AccountCode: l.AcctCode,
+        ShipDate: l.ShipDate, AgreementNo: l.AgrNo
       }))
     };
   } catch (e) {
@@ -283,13 +308,13 @@ async function userName(tenant, ctx, internalKey) {
   return name;
 }
 
-async function approvalsForDrafts(tenant, ctx, filterExtra) {
+async function approvalsForDrafts(tenant, ctx, filterExtra, objs = [OBJ_PURCHASE_REQUEST]) {
   const extra = String(filterExtra || '').replace(/^\s*and\s+/i, '');
   const rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests${extra ? `?$filter=${extra}` : ''}`, 1000);
   const byDraft = new Map();
   // Depois de gerado o documento, o OWDD passa a IsDraft "N" e ObjectEntry = documento criado;
   // DraftEntry continua apontando o rascunho de origem -> não filtrar por IsDraft.
-  rows.filter((a) => String(a.ObjectType) === OBJ_PURCHASE_REQUEST && (a.DraftEntry !== null && a.DraftEntry !== undefined || isDraftFlag(a.IsDraft)))
+  rows.filter((a) => objs.includes(String(a.ObjectType)) && (a.DraftEntry !== null && a.DraftEntry !== undefined || isDraftFlag(a.IsDraft)))
     .forEach((a) => byDraft.set(draftKey(a), a));
   return byDraft;
 }
@@ -324,6 +349,9 @@ function summary(source, d, status, approval) {
     docNum: d.DocNum,
     docDate: d.DocDate,
     requiredDate: d.RequriedDate,
+    dueDate: d.DocDueDate || null,
+    cardCode: d.CardCode || '',
+    cardName: d.CardName || '',
     total: docTotal(d),
     currency: d.DocCurrency,
     comments: d.Comments || '',
@@ -332,28 +360,31 @@ function summary(source, d, status, approval) {
   };
 }
 
-async function getRequest(tenant, ctx, source, entry) {
+async function getRequest(tenant, ctx, source, entry, kind = 'pr') {
   let approval = null;
   if (source === 'draft') {
-    const map = await approvalsForDrafts(tenant, ctx, ` and DraftEntry eq ${Number(entry)}`);
+    const map = await approvalsForDrafts(tenant, ctx, ` and DraftEntry eq ${Number(entry)}`, ALL_OBJ);
     approval = map.get(Number(entry)) || null;
   }
   let d = source === 'draft'
     ? await readDraft(tenant, ctx, entry, true)
-    : await sl.request(tenant, ctx.cookie, 'GET', `/PurchaseRequests(${Number(entry)})`);
+    : await sl.request(tenant, ctx.cookie, 'GET', `/${KINDS[kind].coll}(${Number(entry)})`);
   if (!d) {
     if (!approval) throw new sl.SLError(404, 'NOT_FOUND', 'Rascunho não encontrado ou sem permissão de leitura');
     d = { DocEntry: Number(entry), DocDate: approval.CreationDate, RequesterName: await userName(tenant, ctx, approval.OriginatorID), Comments: approval.Remarks || '', DocumentLines: [] };
   }
+  // No rascunho, o tipo real vem do próprio ODRF (ou do pedido de aprovação)
+  if (source === 'draft') kind = kindByDraftCode(d.DocObjectCode) || (approval && kindByObj(approval.ObjectType)) || kind;
   let generated = null;
   const ap = approval && mapApproval(approval);
   if (ap && ap.generatedEntry) {
     try {
-      const g = await sl.request(tenant, ctx.cookie, 'GET', `/PurchaseRequests(${ap.generatedEntry})?$select=DocEntry,DocNum`);
+      const g = await sl.request(tenant, ctx.cookie, 'GET', `/${KINDS[kind].coll}(${ap.generatedEntry})?$select=DocEntry,DocNum`);
       generated = { entry: g.DocEntry, docNum: g.DocNum };
     } catch (_) { generated = { entry: ap.generatedEntry, docNum: null }; }
   }
   return {
+    kind,
     source,
     generated,
     docType: kindOf(d),
@@ -362,6 +393,11 @@ async function getRequest(tenant, ctx, source, entry) {
     docNum: d.DocNum,
     docDate: d.DocDate,
     requiredDate: d.RequriedDate,
+    dueDate: d.DocDueDate || null,
+    cardCode: d.CardCode || '',
+    cardName: d.CardName || '',
+    numAtCard: d.NumAtCard || '',
+    branch: d.BPL_IDAssignedToInvoice ?? null,
     requester: d.Requester,
     requesterName: d.RequesterName,
     total: docTotal(d),
@@ -378,11 +414,15 @@ async function getRequest(tenant, ctx, source, entry) {
       unitPrice: l.UnitPrice ?? l.Price,
       lineTotal: l.LineTotal,
       requiredDate: l.RequiredDate,
+      shipDate: l.ShipDate || null,
       costCenter: l.CostingCode,
       warehouse: l.WarehouseCode,
       vendor: l.LineVendor,
       freeText: l.FreeText,
       accountCode: l.AccountCode,
+      agreementNo: l.AgreementNo || null,
+      baseType: l.BaseType ?? null,
+      baseEntry: l.BaseEntry ?? null,
       lineStatus: l.LineStatus
     }))
   };
@@ -418,7 +458,7 @@ async function pendingForUser(tenant, ctx, user) {
   } catch (_) { // versão do SL que não aceita $select nesses campos
     rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?$filter=Status eq 'arsPending'`, 2000);
   }
-  const isPR = (a) => String(a.ObjectType) === OBJ_PURCHASE_REQUEST && isDraftFlag(a.IsDraft);
+  const isPR = (a) => ALL_OBJ.includes(String(a.ObjectType)) && isDraftFlag(a.IsDraft);
   // Linhas (WDD1) usam o enum de decisão "ardPending"; aceita também "ars*".
   const isPending = (st) => /Pending$/i.test(String(st || ''));
   const myLine = (a, stageOnly) => (a.ApprovalRequestLines || []).some((l) =>
@@ -456,6 +496,8 @@ async function listPendingApprovals(tenant, ctx, user) {
   for (const a of mine.slice(0, 100)) {
     const d = (await readDraft(tenant, ctx, draftKey(a), false)) || {};
     out.push({
+      kind: kindByObj(a.ObjectType),
+      cardName: d.CardName || '',
       approvalCode: a.Code,
       draftEntry: draftKey(a),
       docType: d.DocType ? kindOf(d) : 'items',
@@ -525,6 +567,7 @@ async function usersContact(tenant, ctx, ids) {
 
 module.exports = {
   name: 'service-layer',
+  KINDS, kindByObj, createDocument, seriesForBranch, docTotal, mapDocStatus, approvalsForDrafts, mapApprovalStatus, summary, readDraft,
   usersContact,
   searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,
   createPurchaseRequest, listMyRequests, getRequest,

@@ -1,0 +1,37 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Contracts"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>contractsTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh" />
+      <Button icon="sap-icon://add" text="{i18n>contractNew}" type="Emphasized" press=".onNew" />
+    </headerContent>
+    <subHeader>
+      <OverflowToolbar>
+        <SearchField liveChange=".onSearch" width="100%" placeholder="{i18n>search}" />
+      </OverflowToolbar>
+    </subHeader>
+    <Table id="list" items="{list>/}" noDataText="{i18n>noData}" growing="true" growingThreshold="30">
+      <columns>
+        <Column><Text text="{i18n>contractDesc}" /></Column>
+        <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>supplier}" /></Column>
+        <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>contractValidity}" /></Column>
+        <Column hAlign="End" minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>contractPlannedAmount}" /></Column>
+        <Column width="12rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>contractConsumption}" /></Column>
+        <Column width="8rem"><Text text="{i18n>rfqStatus}" /></Column>
+      </columns>
+      <items>
+        <ColumnListItem type="Navigation" press=".onOpen">
+          <ObjectIdentifier title="{list>agreementNo} - {list>description}" text="{= ${list>method} === 'monetary' ? ${i18n>contractMonetary} : ${i18n>contractByItem} }" />
+          <Text text="{list>cardCode} - {list>cardName}" />
+          <Text text="{parts: ['list>startDate', 'list>endDate'], formatter: '.formatter.period'}" />
+          <ObjectNumber number="{path: 'list>plannedAmount', formatter: '.formatter.money'}" />
+          <ProgressIndicator percentValue="{path: 'list>consumption', formatter: '.formatter.pctValue'}"
+            displayValue="{path: 'list>consumption', formatter: '.formatter.pct'}" state="{path: 'list>consumption', formatter: '.formatter.consumptionState'}"
+            displayOnly="true" class="pbAgBar" />
+          <ObjectStatus text="{parts: [{value: 'agSt_'}, 'list>status'], formatter: '.formatter.prefixed'}"
+            state="{path: 'list>status', formatter: '.formatter.agState'}" />
+        </ColumnListItem>
+      </items>
+    </Table>
+  </Page>
+</mvc:View>

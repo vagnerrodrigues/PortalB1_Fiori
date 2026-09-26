@@ -1,0 +1,48 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:f="sap.ui.layout.form"
+  core:require="{ Float: 'sap/ui/model/type/Float' }">
+  <Dialog id="answerDialog" title="{parts: [{value: 'rfqAnswerTitle'}, 'ans>/cardName'], formatter: '.formatter.txt'}"
+    contentWidth="60rem" resizable="true" draggable="true">
+    <content>
+      <MessageStrip text="{i18n>rfqAnswerHint}" type="Information" showIcon="true" class="sapUiSmallMargin" />
+      <Table items="{ans>/lines}">
+        <columns>
+          <Column width="5rem"><Text text="{i18n>rfqQuoted}" /></Column>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column hAlign="End" width="10rem"><Text text="{i18n>orderPrice}" /></Column>
+          <Column width="10rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>shipDate}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>remarks}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <CheckBox selected="{ans>quoted}" />
+            <ObjectIdentifier title="{ans>itemName}" text="{ans>quantity} {ans>uom}" />
+            <Input value="{path: 'ans>unitPrice', type: 'Float', formatOptions: {minFractionDigits: 2, maxFractionDigits: 4}}"
+              textAlign="End" enabled="{ans>quoted}" />
+            <DatePicker value="{ans>deliveryDate}" valueFormat="yyyy-MM-dd" displayFormat="short" enabled="{ans>quoted}" />
+            <Input value="{ans>notes}" maxLength="90" />
+          </ColumnListItem>
+        </items>
+      </Table>
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" columnsL="2" columnsM="2" labelSpanL="4" labelSpanM="4">
+        <Label text="{i18n>rfqPaymentTerms}" />
+        <Input value="{ans>/paymentTerms}" maxLength="60" />
+        <Label text="{i18n>rfqFreight}" />
+        <Select selectedKey="{ans>/freight}">
+          <core:Item key="" text="" />
+          <core:Item key="CIF" text="CIF" />
+          <core:Item key="FOB" text="FOB" />
+        </Select>
+        <Label text="{i18n>validUntil}" />
+        <DatePicker value="{ans>/validUntil}" valueFormat="yyyy-MM-dd" displayFormat="medium" />
+        <Label text="{i18n>rfqProposalRef}" />
+        <Input value="{ans>/proposalRef}" maxLength="40" />
+      </f:SimpleForm>
+    </content>
+    <beginButton>
+      <Button text="{i18n>confirm}" type="Emphasized" press=".onAnswerSave" />
+    </beginButton>
+    <endButton>
+      <Button text="{i18n>cancel}" press=".onAnswerClose" />
+    </endButton>
+  </Dialog>
+</core:FragmentDefinition>

@@ -170,7 +170,7 @@ sap.ui.define([
       }.bind(this))).then(function (oRes) {
         var sKey = oRes.source === "draft" ? "submittedPending" : "submitted";
         this.toast(this.text(sKey, [oRes.docNum]));
-        this.getRouter().navTo("compras.detail", { source: oRes.source, entry: oRes.entry }, true);
+        this.navToDoc("pr", oRes.source, oRes.entry, null, true);
       }.bind(this)).catch(function () {});
     }
   });

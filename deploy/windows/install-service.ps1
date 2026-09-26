@@ -70,7 +70,7 @@ if ($existing) {
 Step "Copiando aplicação para $InstallDir"
 New-Item -ItemType Directory -Force -Path $InstallDir -ErrorAction Stop | Out-Null
 if ($source -ne $InstallDir) {
-  robocopy $source $InstallDir /E /NFL /NDL /NJH /NJS /XD node_modules logs .git /XF tenants.json | Out-Null
+  robocopy $source $InstallDir /E /NFL /NDL /NJH /NJS /XD node_modules logs data .git /XF tenants.json | Out-Null
   if ($LASTEXITCODE -ge 8) { throw "Falha ao copiar arquivos (robocopy $LASTEXITCODE)" }
   # tenants.json do pacote só é copiado na primeira instalação (nunca sobrescreve o do servidor)
   $srcTenants = Join-Path $source "config\tenants.json"

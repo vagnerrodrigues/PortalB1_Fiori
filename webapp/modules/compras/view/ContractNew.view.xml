@@ -1,0 +1,84 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.ContractNew"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.ui.layout.form" xmlns:core="sap.ui.core"
+  core:require="{ Float: 'sap/ui/model/type/Float' }">
+  <Page title="{i18n>contractNewTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3" columnsL="1" columnsM="1">
+        <Label text="{i18n>supplier}" required="true" />
+        <Input value="{ag>/cardLabel}" showSuggestion="true" filterSuggests="false" startSuggestion="2" width="28rem"
+          suggest=".onVendorSuggest" suggestionItemSelected=".onVendorSelected" liveChange=".onVendorTyped"
+          valueState="{= ${ag>/cardLabel} &amp;&amp; !${ag>/cardCode} ? 'Warning' : 'None'}"
+          suggestionItems="{path: 'md>/vendorSuggest', templateShareable: true}">
+          <suggestionItems>
+            <core:ListItem key="{md>cardCode}" text="{md>cardCode} - {md>cardName}" />
+          </suggestionItems>
+        </Input>
+        <Label text="{i18n>contractDesc}" required="true" />
+        <Input value="{ag>/description}" maxLength="254" />
+        <Label text="{i18n>contractStart}" required="true" />
+        <HBox alignItems="Center">
+          <DatePicker value="{ag>/startDate}" valueFormat="yyyy-MM-dd" displayFormat="medium" width="12rem" />
+          <Text text="—" class="sapUiSmallMarginBeginEnd" />
+          <DatePicker value="{ag>/endDate}" valueFormat="yyyy-MM-dd" displayFormat="medium" width="12rem" />
+        </HBox>
+        <Label text="{i18n>contractMethod}" />
+        <SegmentedButton selectedKey="{ag>/method}">
+          <items>
+            <SegmentedButtonItem key="item" text="{i18n>contractByItem}" />
+            <SegmentedButtonItem key="monetary" text="{i18n>contractMonetary}" />
+          </items>
+        </SegmentedButton>
+        <Label text="{i18n>remarks}" />
+        <TextArea value="{ag>/remarks}" rows="2" growing="true" maxLength="254" />
+      </f:SimpleForm>
+
+      <Table items="{ag>/lines}" noDataText="{i18n>noLines}" class="sapUiResponsiveContentPadding">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{i18n>items} ({= ${ag>/lines}.length})" />
+            <ToolbarSpacer />
+            <Button text="{i18n>addItem}" icon="sap-icon://add" press=".onAddLine" />
+          </OverflowToolbar>
+        </headerToolbar>
+        <columns>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column width="9rem" hAlign="End" visible="{= ${ag>/method} === 'item' }"><Text text="{i18n>contractPlannedQty}" /></Column>
+          <Column width="4rem" minScreenWidth="Tablet" demandPopin="true" visible="{= ${ag>/method} === 'item' }"><Text text="{i18n>uom}" /></Column>
+          <Column width="10rem" hAlign="End" visible="{= ${ag>/method} === 'item' }"><Text text="{i18n>orderPrice}" /></Column>
+          <Column width="11rem" hAlign="End"><Text text="{i18n>contractPlannedAmount}" /></Column>
+          <Column width="3rem" />
+        </columns>
+        <items>
+          <ColumnListItem>
+            <Input value="{ag>itemLabel}" showSuggestion="true" filterSuggests="false" startSuggestion="2"
+              suggest=".onItemSuggest" suggestionItemSelected=".onItemSelected" liveChange=".onItemTyped"
+              valueState="{= ${ag>itemLabel} &amp;&amp; !${ag>itemCode} ? 'Warning' : 'None'}"
+              suggestionItems="{path: 'md>/itemSuggest', templateShareable: true}">
+              <suggestionItems>
+                <core:ListItem key="{md>itemCode}" text="{md>itemCode} - {md>itemName}" additionalText="{md>uom}" />
+              </suggestionItems>
+            </Input>
+            <Input value="{path: 'ag>plannedQty', type: 'Float', formatOptions: {minFractionDigits: 0, maxFractionDigits: 3}}" textAlign="End" change=".onRecalc" />
+            <Text text="{ag>uom}" />
+            <Input value="{path: 'ag>unitPrice', type: 'Float', formatOptions: {minFractionDigits: 2, maxFractionDigits: 4}}" textAlign="End" change=".onRecalc" />
+            <VBox>
+              <Input value="{path: 'ag>plannedAmount', type: 'Float', formatOptions: {minFractionDigits: 2, maxFractionDigits: 2}}" textAlign="End"
+                visible="{= ${ag>/method} === 'monetary' }" />
+              <ObjectNumber number="{path: 'ag>calcAmount', formatter: '.formatter.money'}" visible="{= ${ag>/method} === 'item' }" />
+            </VBox>
+            <Button icon="sap-icon://delete" type="Transparent" press=".onRemoveLine" />
+          </ColumnListItem>
+        </items>
+      </Table>
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <Text text="{i18n>contractPlannedAmount}:" />
+        <ObjectNumber number="{path: 'ag>/total', formatter: '.formatter.money'}" class="pcTotal" />
+        <ToolbarSpacer />
+        <Button text="{i18n>contractSaveDraft}" press=".onSave('DRAFT')" />
+        <Button text="{i18n>contractSave}" type="Emphasized" icon="sap-icon://accept" press=".onSave('ACTIVE')" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

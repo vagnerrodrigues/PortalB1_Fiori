@@ -1,17 +1,20 @@
 <mvc:View controllerName="portal.b1.modules.compras.controller.Detail"
   xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core">
-  <Page title="{parts: ['doc>/source', 'doc>/docNum', 'doc>/entry', 'doc>/docType'], formatter: '.formatter.anyTitle'}" showNavButton="true" navButtonPress=".onNavBack">
+  <Page title="{parts: ['doc>/kind', 'doc>/source', 'doc>/docNum', 'doc>/entry', 'doc>/docType'], formatter: '.formatter.kindTitle'}" showNavButton="true" navButtonPress=".onNavBack">
     <content>
-      <ObjectHeader title="{parts: ['doc>/source', 'doc>/docNum', 'doc>/entry', 'doc>/docType'], formatter: '.formatter.anyTitle'}" responsive="true"
+      <ObjectHeader title="{parts: ['doc>/kind', 'doc>/source', 'doc>/docNum', 'doc>/entry', 'doc>/docType'], formatter: '.formatter.kindTitle'}" responsive="true"
         number="{path: 'doc>/total', formatter: '.formatter.money'}">
         <statuses>
-          <ObjectStatus text="{path: 'doc>/status', formatter: '.formatter.statusText'}"
+          <ObjectStatus text="{parts: ['doc>/kind', 'doc>/status'], formatter: '.formatter.docStatusText'}"
             state="{path: 'doc>/status', formatter: '.formatter.statusState'}" />
         </statuses>
-        <ObjectAttribute title="{i18n>requester}" text="{doc>/requesterName}" />
+        <ObjectAttribute title="{i18n>supplier}" text="{doc>/cardCode} - {doc>/cardName}" visible="{= !!${doc>/cardCode} }" />
+        <ObjectAttribute title="{i18n>requester}" text="{doc>/requesterName}" visible="{= !!${doc>/requesterName} }" />
         <ObjectAttribute title="{i18n>docDate}" text="{path: 'doc>/docDate', formatter: '.formatter.date'}" />
-        <ObjectAttribute title="{i18n>requiredDate}" text="{path: 'doc>/requiredDate', formatter: '.formatter.date'}" />
-        <ObjectAttribute title="{i18n>comments}" text="{path: 'doc>/comments', formatter: '.formatter.cleanComments'}" />
+        <ObjectAttribute title="{i18n>requiredDate}" text="{path: 'doc>/requiredDate', formatter: '.formatter.date'}" visible="{= ${doc>/kind} !== 'po' }" />
+        <ObjectAttribute title="{= ${doc>/kind} === 'pq' ? ${i18n>validUntil} : ${i18n>dueDate} }" text="{path: 'doc>/dueDate', formatter: '.formatter.date'}" visible="{= ${doc>/kind} !== 'pr' &amp;&amp; !!${doc>/dueDate} }" />
+        <ObjectAttribute title="{i18n>numAtCard}" text="{doc>/numAtCard}" visible="{= !!${doc>/numAtCard} }" />
+        <ObjectAttribute title="{i18n>comments}" text="{path: 'doc>/comments', formatter: '.formatter.cleanComments'}" visible="{= !!${doc>/comments} }" />
       </ObjectHeader>
 
       <MessageStrip type="Success" showIcon="true" class="sapUiSmallMargin" text="{i18n>status_APPROVED}"
@@ -25,10 +28,14 @@
         <columns>
           <Column><Text text="{i18n>item}" /></Column>
           <Column hAlign="End"><Text text="{i18n>quantity}" /></Column>
-          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>unitPrice}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{= ${doc>/kind} === 'pr' ? ${i18n>unitPrice} : ${i18n>orderPrice} }" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true" visible="{= ${doc>/kind} !== 'pr' }"><Text text="{i18n>lineTotal}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true" visible="{= ${doc>/kind} !== 'pr' }"><Text text="{i18n>shipDate}" /></Column>
           <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>costCenter}" /></Column>
           <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} !== 'service' }"><Text text="{i18n>warehouse}" /></Column>
-          <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} !== 'service' }"><Text text="{i18n>vendor}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} !== 'service' &amp;&amp; ${doc>/kind} === 'pr' }"><Text text="{i18n>vendor}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/kind} === 'po' }"><Text text="{i18n>agreement}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/kind} !== 'pr' }"><Text text="{i18n>remarks}" /></Column>
           <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} === 'service' }"><Text text="{i18n>expAccount}" /></Column>
         </columns>
         <items>
@@ -36,9 +43,13 @@
             <ObjectIdentifier title="{doc>itemCode}" text="{doc>itemName}" />
             <ObjectNumber number="{doc>quantity}" unit="{doc>uom}" />
             <ObjectNumber number="{path: 'doc>unitPrice', formatter: '.formatter.money'}" />
+            <ObjectNumber number="{path: 'doc>lineTotal', formatter: '.formatter.money'}" />
+            <Text text="{path: 'doc>shipDate', formatter: '.formatter.date'}" />
             <Text text="{doc>costCenter}" />
             <Text text="{doc>warehouse}" />
             <Text text="{doc>vendor}" />
+            <Text text="{doc>agreementNo}" />
+            <Text text="{doc>freeText}" />
             <Text text="{doc>accountCode}" />
           </ColumnListItem>
         </items>

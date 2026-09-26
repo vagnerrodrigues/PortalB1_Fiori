@@ -28,8 +28,20 @@ function canAccess(tenant, user, moduleId, mod) {
   return deps.includes(user.department) || users.includes(user.userCode);
 }
 
+/**
+ * Tiles de comprador (buyer: true) dentro de um módulo: tenants.json > moduleAccess.<módulo>.buyers
+ *   "compras": { "departments": [1, 2], "buyers": { "departments": [4], "users": ["joao"] } }
+ * Sem "buyers" configurado, todos que acessam o módulo veem essas telas.
+ */
+function canTile(tenant, user, moduleId, tile) {
+  if (!tile || !tile.buyer || user.superuser) return true;
+  const rule = ((tenant.moduleAccess || {})[moduleId] || {}).buyers;
+  if (!rule) return true;
+  return (rule.departments || []).includes(user.department) || (rule.users || []).includes(user.userCode);
+}
+
 function modulesForUser(tenant, user, registry) {
   return enabledModules(tenant, registry).filter((m) => canAccess(tenant, user, m.id, m));
 }
 
-module.exports = { enabledModules, canAccess, modulesForUser };
+module.exports = { enabledModules, canAccess, canTile, modulesForUser };

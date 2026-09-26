@@ -18,7 +18,7 @@ const DEFAULTS = {
     enabled: false, host: '', port: 587, security: 'starttls', // starttls | ssl | none
     user: '', passwordEnc: null, fromName: '', fromAddress: '', replyTo: '', rejectUnauthorized: true
   },
-  notify: { approvalRequested: true, approved: true, rejected: true, generated: true }
+  notify: { approvalRequested: true, approved: true, rejected: true, generated: true, rfqAnswered: true }
 };
 const EVENTS = Object.keys(DEFAULTS.notify);
 

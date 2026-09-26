@@ -21,28 +21,32 @@ sap.ui.define([
       var oQuery = oArgs["?query"] || {};
       this._source = oArgs.source;
       this._entry = oArgs.entry;
+      this._kind = this.SLUG_KIND[oArgs.kind] || "pr";
       this.getModel("view").setData({ mode: oQuery.mode === "approve" ? "approve" : "view", approvalCode: oQuery.code || null });
       this._load();
     },
 
     _load: function () {
       this.getModel("doc").setData({});
-      return this.busy(this.api.get("/api/m/compras/purchase-requests/" + this._source + "/" + this._entry)).then(function (o) {
-        o.attachmentBase = "/api/m/compras/purchase-requests/" + this._source + "/" + this._entry + "/attachments";
+      var sBase = "/api/m/compras/docs/" + this._kind + "/" + this._source + "/" + this._entry;
+      return this.busy(this.api.get(sBase)).then(function (o) {
+        o.kind = o.kind || this._kind;
+        this._kind = o.kind; // rascunho: o tipo real vem do SAP
+        o.attachmentBase = sBase + "/attachments";
         this.getModel("doc").setData(o);
       }.bind(this)).catch(function () {});
     },
 
     onOpenGenerated: function () {
       var g = this.getModel("doc").getProperty("/generated");
-      if (g) { this.getRouter().navTo("compras.detail", { source: "doc", entry: g.entry }); }
+      if (g) { this.navToDoc(this._kind, "doc", g.entry); }
     },
 
     // Requisitante efetiva o rascunho aprovado (mesmo comportamento do B1: originador gera o documento)
     onFinalize: function () {
-      this.busy(this.api.post("/api/m/compras/purchase-requests/draft/" + this._entry + "/finalize")).then(function () {
+      this.busy(this.api.post("/api/m/compras/docs/" + this._kind + "/draft/" + this._entry + "/finalize")).then(function () {
         this.toast(this.text("finalized"));
-        this.getRouter().navTo("compras.mine", {}, true);
+        this.getRouter().navTo(({ pr: "compras.mine", pq: "compras.offers", po: "compras.orders" })[this._kind] || "compras.mine", {}, true);
       }.bind(this)).catch(function () {});
     },
 

@@ -1,0 +1,79 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Detail"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core">
+  <Page title="{parts: ['doc>/source', 'doc>/docNum', 'doc>/entry', 'doc>/docType'], formatter: '.formatter.anyTitle'}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <ObjectHeader title="{parts: ['doc>/source', 'doc>/docNum', 'doc>/entry', 'doc>/docType'], formatter: '.formatter.anyTitle'}" responsive="true"
+        number="{path: 'doc>/total', formatter: '.formatter.money'}">
+        <statuses>
+          <ObjectStatus text="{path: 'doc>/status', formatter: '.formatter.statusText'}"
+            state="{path: 'doc>/status', formatter: '.formatter.statusState'}" />
+        </statuses>
+        <ObjectAttribute title="{i18n>requester}" text="{doc>/requesterName}" />
+        <ObjectAttribute title="{i18n>docDate}" text="{path: 'doc>/docDate', formatter: '.formatter.date'}" />
+        <ObjectAttribute title="{i18n>requiredDate}" text="{path: 'doc>/requiredDate', formatter: '.formatter.date'}" />
+        <ObjectAttribute title="{i18n>comments}" text="{path: 'doc>/comments', formatter: '.formatter.cleanComments'}" />
+      </ObjectHeader>
+
+      <MessageStrip type="Success" showIcon="true" class="sapUiSmallMargin" text="{i18n>status_APPROVED}"
+        visible="{parts: ['doc>/source', 'doc>/status'], formatter: '.formatter.isApprovedDraft'}" />
+      <MessageStrip type="Success" showIcon="true" class="sapUiSmallMargin" visible="{= !!${doc>/generated} }"
+        text="{i18n>generatedAs} {= ${doc>/generated/docNum} || ${doc>/generated/entry} }">
+        <link><Link text="{i18n>openGenerated}" press=".onOpenGenerated" /></link>
+      </MessageStrip>
+
+      <Table items="{doc>/lines}" headerText="{i18n>items}" class="sapUiResponsiveContentPadding">
+        <columns>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column hAlign="End"><Text text="{i18n>quantity}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>unitPrice}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>costCenter}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} !== 'service' }"><Text text="{i18n>warehouse}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} !== 'service' }"><Text text="{i18n>vendor}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} === 'service' }"><Text text="{i18n>expAccount}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <ObjectIdentifier title="{doc>itemCode}" text="{doc>itemName}" />
+            <ObjectNumber number="{doc>quantity}" unit="{doc>uom}" />
+            <ObjectNumber number="{path: 'doc>unitPrice', formatter: '.formatter.money'}" />
+            <Text text="{doc>costCenter}" />
+            <Text text="{doc>warehouse}" />
+            <Text text="{doc>vendor}" />
+            <Text text="{doc>accountCode}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <core:Fragment fragmentName="portal.b1.view.fragments.AttachmentsList" type="XML" />
+
+      <Table items="{doc>/approval/steps}" headerText="{i18n>approvalHistory}" visible="{= !!${doc>/approval}}"
+        class="sapUiResponsiveContentPadding sapUiMediumMarginTop">
+        <columns>
+          <Column width="6rem"><Text text="{i18n>stage}" /></Column>
+          <Column><Text text="Status" /></Column>
+          <Column><Text text="{i18n>remarks}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>docDate}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <Text text="{doc>stage}" />
+            <ObjectStatus text="{path: 'doc>status', formatter: '.formatter.statusText'}" state="{path: 'doc>status', formatter: '.formatter.statusState'}" />
+            <Text text="{doc>remarks}" />
+            <Text text="{path: 'doc>date', formatter: '.formatter.date'}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+    </content>
+    <footer>
+      <OverflowToolbar visible="{= ${view>/mode} === 'approve' || (${doc>/source} === 'draft' &amp;&amp; ${doc>/status} === 'APPROVED')}">
+        <ToolbarSpacer />
+        <Button text="{i18n>finalize}" type="Emphasized" icon="sap-icon://accept" press=".onFinalize"
+          visible="{= ${view>/mode} !== 'approve' &amp;&amp; ${doc>/source} === 'draft' &amp;&amp; ${doc>/status} === 'APPROVED'}" />
+        <Button text="{i18n>approve}" type="Accept" icon="sap-icon://accept" press=".onDecide(true)"
+          visible="{= ${view>/mode} === 'approve' &amp;&amp; ${doc>/status} === 'PENDING'}" />
+        <Button text="{i18n>reject}" type="Reject" icon="sap-icon://decline" press=".onDecide(false)"
+          visible="{= ${view>/mode} === 'approve' &amp;&amp; ${doc>/status} === 'PENDING'}" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

@@ -1,0 +1,76 @@
+<mvc:View controllerName="portal.b1.modules.parceiros.controller.New"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.ui.layout.form" xmlns:core="sap.ui.core" xmlns:l="sap.ui.layout">
+  <Page title="{i18n>bpNew}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <MessageStrip text="{i18n>bpLeadInfo}" type="Information" showIcon="true" class="sapUiSmallMargin" />
+
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3"
+        columnsL="1" columnsM="1" title="{i18n>bpDocument}">
+        <Label text="{i18n>bpTaxId}" required="true" />
+        <Input id="taxId" value="{lead>/taxId}" placeholder="00.000.000/0000-00" submit=".onLookup" liveChange=".onTaxIdChange" maxLength="18"
+          valueState="{lead>/taxIdState}" valueStateText="{lead>/taxIdStateText}">
+          <layoutData><l:GridData span="L4 M6 S8" /></layoutData>
+        </Input>
+        <Button text="{i18n>bpLookup}" icon="sap-icon://search" press=".onLookup">
+          <layoutData><l:GridData span="L2 M3 S4" /></layoutData>
+        </Button>
+        <Label text="" />
+        <MessageStrip text="{lead>/lookupMsg}" type="{lead>/lookupType}" showIcon="true" visible="{= !!${lead>/lookupMsg} }" />
+        <Label text="{i18n>bpSituation}" visible="{= !!${lead>/situation} }" />
+        <Text text="{lead>/situation}" visible="{= !!${lead>/situation} }" />
+      </f:SimpleForm>
+
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3"
+        columnsL="1" columnsM="1" title="{i18n>bpGeneral}">
+        <Label text="{i18n>bpName}" required="true" />
+        <Input id="bpName" value="{lead>/name}" maxLength="100" />
+        <Label text="{i18n>bpTradeName}" />
+        <Input value="{lead>/tradeName}" maxLength="100" />
+        <Label text="{i18n>bpStateReg}" />
+        <Input value="{lead>/stateRegistration}" maxLength="20" />
+        <Label text="{i18n>bpPhone}" />
+        <Input value="{lead>/phone}" type="Tel" maxLength="20" />
+        <Label text="{i18n>bpEmail}" />
+        <Input value="{lead>/email}" type="Email" maxLength="100" />
+      </f:SimpleForm>
+
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3"
+        columnsL="1" columnsM="1" title="{i18n>bpAddress}">
+        <Label text="{i18n>bpZip}" />
+        <Input value="{lead>/address/zipCode}" maxLength="9" width="10rem" liveChange=".onZipChange" placeholder="00000-000" />
+        <Label text="{i18n>bpStreet}" />
+        <Input value="{lead>/address/street}" maxLength="100" />
+        <Label text="{i18n>bpStreetNo} / {i18n>bpComplement}" />
+        <Input value="{lead>/address/streetNo}" maxLength="10">
+          <layoutData><l:GridData span="L2 M3 S4" /></layoutData>
+        </Input>
+        <Input value="{lead>/address/complement}" maxLength="50" />
+        <Label text="{i18n>bpBlock}" />
+        <Input value="{lead>/address/block}" maxLength="100" />
+        <Label text="{i18n>bpCity} / {i18n>bpState}" />
+        <Input value="{lead>/address/city}" maxLength="100" />
+        <ComboBox selectedKey="{lead>/address/state}" items="{lead>/ufs}">
+          <core:Item key="{lead>}" text="{lead>}" />
+          <layoutData><l:GridData span="L2 M3 S4" /></layoutData>
+        </ComboBox>
+      </f:SimpleForm>
+
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3"
+        columnsL="1" columnsM="1" title="{i18n>bpContact}">
+        <Label text="{i18n>bpContactName}" />
+        <Input value="{lead>/contact/name}" maxLength="50" />
+        <Label text="{i18n>bpPhone} / {i18n>bpEmail}" />
+        <Input value="{lead>/contact/phone}" type="Tel" maxLength="20" />
+        <Input value="{lead>/contact/email}" type="Email" maxLength="100" />
+        <Label text="{i18n>bpNotes}" />
+        <TextArea value="{lead>/notes}" rows="3" maxLength="254" />
+      </f:SimpleForm>
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <ToolbarSpacer />
+        <Button text="{i18n>bpSave}" type="Emphasized" icon="sap-icon://save" press=".onSave" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

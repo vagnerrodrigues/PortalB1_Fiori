@@ -1,0 +1,50 @@
+/* ---------- Layout ---------- */
+.pcTiles .sapMGT { margin: 0 1rem 1rem 0; }
+.pcTotal { font-size: 1.25rem; font-weight: 600; }
+
+/* ---------- Barra superior na cor da marca (todas as páginas) ---------- */
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX,
+.pbBrandBar.sapMIBar {
+  background: var(--pbHeader, #070070) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  border-bottom: 3px solid var(--pbAccent, #035DD0);
+}
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX .sapMTitle,
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX .sapMText,
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX .sapMBtnIcon,
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX .sapMBtnContent,
+.pbBrandBar .sapMTitle, .pbBrandBar .sapMText, .pbBrandBar .sapMBtnIcon, .pbBrandBar .sapMBtnContent {
+  color: var(--pbHeaderText, #FFFFFF) !important;
+}
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX .sapMBtnInner:not(.sapMBtnEmphasized),
+.pbBrandBar .sapMBtnInner:not(.sapMBtnEmphasized) {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.45) !important;
+}
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX .sapMBtnInner:not(.sapMBtnEmphasized):hover,
+.pbBrandBar .sapMBtnInner:not(.sapMBtnEmphasized):hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+.sapMPage > .sapMPageHeader .sapMIBar.sapMHeader-CTX .sapMBtnEmphasized {
+  background: var(--pbAccent, #035DD0) !important;
+  border-color: var(--pbAccent, #035DD0) !important;
+}
+.pbLogo { height: 1.625rem; width: auto; margin-right: 0.25rem; }
+.pbSep.sapMTBSeparator { background: rgba(255, 255, 255, 0.4) !important; height: 1.5rem; }
+.pbProduct { font-weight: 700; letter-spacing: 0.01em; }
+.pbCompany { opacity: 0.8; margin-left: 0.5rem; }
+
+/* ---------- Launchpad ---------- */
+.pbModuleTitle { border-left: 4px solid var(--pbAccent, #035DD0); padding-left: 0.5rem; }
+.pcTiles .sapMGT:hover { box-shadow: 0 4px 14px rgba(7, 0, 112, 0.18); }
+
+/* ---------- Login ---------- */
+.pbLoginBg { background: linear-gradient(135deg, var(--pbLoginFrom, #070070) 0%, var(--pbLoginTo, #035DD0) 100%) !important; }
+.pbLoginBg > section, .pbLoginBg .sapMPageEnableScrolling { background: transparent !important; }
+.pbLoginCard {
+  max-width: 400px; width: 100%; background: #FFFFFF; border-radius: 1rem;
+  padding: 2rem; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+}
+.pbLoginLogo { width: 100%; height: auto; max-height: 4rem; object-fit: contain; object-position: left; }
+.pbLoginTitle.sapMTitle { color: var(--pbHeader, #070070) !important; margin-top: 1.25rem; padding-top: 1rem; border-top: 3px solid var(--pbAccent, #035DD0); }
+.pbLoginFooter { color: rgba(255, 255, 255, 0.75); margin-top: 1.25rem; font-size: 0.8125rem; }

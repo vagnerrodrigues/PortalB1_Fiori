@@ -1,0 +1,15 @@
+[
+  {
+    "id": "itens-sem-giro",
+    "title": "Itens sem venda no período",
+    "category": "Estoque",
+    "description": "Exemplo de relatório do cliente: itens com estoque e sem NF de saída no período",
+    "params": [{ "name": "dataInicio", "label": "Sem venda desde", "type": "date", "default": "yearStart" }],
+    "columns": [
+      { "key": "ItemCode", "label": "Item", "type": "text" },
+      { "key": "ItemName", "label": "Descrição", "type": "text" },
+      { "key": "OnHand", "label": "Em estoque", "type": "number", "sum": true }
+    ],
+    "sql": "SELECT T0.\"ItemCode\", T0.\"ItemName\", T0.\"OnHand\" FROM \"OITM\" T0 WHERE T0.\"OnHand\" > 0 AND NOT EXISTS (SELECT 1 FROM \"INV1\" T1 INNER JOIN \"OINV\" T2 ON T1.\"DocEntry\" = T2.\"DocEntry\" WHERE T1.\"ItemCode\" = T0.\"ItemCode\" AND T2.\"DocDate\" >= :dataInicio) ORDER BY T0.\"OnHand\" DESC"
+  }
+]

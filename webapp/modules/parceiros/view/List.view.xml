@@ -1,0 +1,36 @@
+<mvc:View controllerName="portal.b1.modules.parceiros.controller.List"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>bpListTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://add-contact" text="{i18n>bpNew}" type="Emphasized" press=".onNew" />
+    </headerContent>
+    <subHeader>
+      <OverflowToolbar>
+        <SearchField id="search" placeholder="{i18n>bpSearch}" search=".onSearch" liveChange=".onLiveSearch" width="100%">
+          <layoutData><OverflowToolbarLayoutData minWidth="12rem" shrinkable="true" priority="NeverOverflow" /></layoutData>
+        </SearchField>
+        <SegmentedButton selectedKey="{bp>/type}" selectionChange=".onSearch">
+          <items>
+            <SegmentedButtonItem key="" text="{i18n>bpAll}" />
+            <SegmentedButtonItem key="customer" text="{i18n>bpCustomers}" />
+            <SegmentedButtonItem key="supplier" text="{i18n>bpSuppliers}" />
+            <SegmentedButtonItem key="lead" text="{i18n>bpLeads}" />
+          </items>
+        </SegmentedButton>
+      </OverflowToolbar>
+    </subHeader>
+    <List items="{bp>/items}" noDataText="{i18n>noData}" growing="true" growingThreshold="30">
+      <ObjectListItem title="{bp>cardName}" type="Navigation" press=".onOpen"
+        number="{= ${bp>type} === 'lead' ? '' : ${path: 'bp>balance', formatter: '.formatter.money'} }">
+        <firstStatus>
+          <ObjectStatus text="{path: 'bp>type', formatter: '.formatter.bpType'}" state="{path: 'bp>type', formatter: '.formatter.bpTypeState'}" />
+        </firstStatus>
+        <secondStatus>
+          <ObjectStatus text="{i18n>bpInactive}" state="Error" visible="{= !${bp>active} }" />
+        </secondStatus>
+        <ObjectAttribute text="{bp>cardCode}{= ${bp>tradeName} ? ' · ' + ${bp>tradeName} : ''}" />
+        <ObjectAttribute text="{bp>city}{= ${bp>phone} ? ' · ' + ${bp>phone} : ''}" />
+      </ObjectListItem>
+    </List>
+  </Page>
+</mvc:View>

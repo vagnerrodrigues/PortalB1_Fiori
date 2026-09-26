@@ -1,0 +1,22 @@
+<mvc:View controllerName="portal.b1.controller.Home"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page>
+    <customHeader>
+      <Bar class="pbBrandBar">
+        <contentLeft>
+          <Image src="{= ${brand>/logoOnDark} || ${brand>/logo} }" class="pbLogo" decorative="false" alt="{brand>/company}" />
+          <ToolbarSeparator class="pbSep" />
+          <Title text="{brand>/productName}" class="pbProduct" level="H1" />
+          <Text text="{session>/tenant/name}" class="pbCompany" visible="{= !${device>/system/phone} }" />
+        </contentLeft>
+        <contentRight>
+          <Text text="{session>/user/userName}" visible="{= !${device>/system/phone} }" />
+          <Button icon="sap-icon://log" tooltip="{i18n>logout}" press=".onLogout" />
+        </contentRight>
+      </Bar>
+    </customHeader>
+    <content>
+      <VBox id="modules" class="sapUiMediumMargin" />
+    </content>
+  </Page>
+</mvc:View>

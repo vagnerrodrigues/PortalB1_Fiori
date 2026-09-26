@@ -1,0 +1,62 @@
+<mvc:View controllerName="portal.b1.modules.despesas.controller.Detail"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core">
+  <Page title="{parts: ['doc>/source', 'doc>/docNum', 'doc>/entry'], formatter: '.formatter.expTitle'}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <ObjectHeader title="{parts: ['doc>/source', 'doc>/docNum', 'doc>/entry'], formatter: '.formatter.expTitle'}" responsive="true"
+        number="{path: 'doc>/total', formatter: '.formatter.money'}">
+        <statuses>
+          <ObjectStatus text="{path: 'doc>/status', formatter: '.formatter.statusText'}" state="{path: 'doc>/status', formatter: '.formatter.statusState'}" />
+        </statuses>
+        <ObjectAttribute title="{i18n>requester}" text="{doc>/requesterName}" />
+        <ObjectAttribute title="{i18n>docDate}" text="{path: 'doc>/docDate', formatter: '.formatter.date'}" />
+        <ObjectAttribute title="{i18n>expPurpose}" text="{doc>/purpose}" visible="{= !!${doc>/purpose} }" />
+      </ObjectHeader>
+
+      <MessageStrip type="Success" showIcon="true" class="sapUiSmallMargin" visible="{= !!${doc>/generated} }"
+        text="{i18n>expGenerated} {= ${doc>/generated/docNum} || ${doc>/generated/entry} }" />
+
+      <Table items="{doc>/lines}" headerText="{i18n>expItems}" class="sapUiResponsiveContentPadding">
+        <columns>
+          <Column width="9rem"><Text text="{i18n>expDate}" /></Column>
+          <Column><Text text="{i18n>expDescription}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>expAccount}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>costCenter}" /></Column>
+          <Column hAlign="End"><Text text="{i18n>expAmount}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <Text text="{path: 'doc>requiredDate', formatter: '.formatter.date'}" />
+            <Text text="{doc>itemName}" />
+            <Text text="{doc>accountCode}" />
+            <Text text="{doc>costCenter}" />
+            <ObjectNumber number="{path: 'doc>lineTotal', formatter: '.formatter.money'}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <core:Fragment fragmentName="portal.b1.view.fragments.AttachmentsList" type="XML" />
+
+      <Table items="{doc>/approval/steps}" headerText="{i18n>approvalHistory}" visible="{= !!${doc>/approval} }"
+        class="sapUiResponsiveContentPadding sapUiMediumMarginTop">
+        <columns>
+          <Column width="6rem"><Text text="{i18n>stage}" /></Column>
+          <Column><Text text="Status" /></Column>
+          <Column><Text text="{i18n>remarks}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <Text text="{doc>stage}" />
+            <ObjectStatus text="{path: 'doc>status', formatter: '.formatter.statusText'}" state="{path: 'doc>status', formatter: '.formatter.statusState'}" />
+            <Text text="{doc>remarks}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+    </content>
+    <footer>
+      <OverflowToolbar visible="{= ${doc>/source} === 'draft' &amp;&amp; ${doc>/status} === 'APPROVED' }">
+        <ToolbarSpacer />
+        <Button text="{i18n>expFinalize}" type="Emphasized" icon="sap-icon://accept" press=".onFinalize" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

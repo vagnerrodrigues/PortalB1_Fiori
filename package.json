@@ -1,0 +1,18 @@
+{
+  "name": "portal-b1",
+  "version": "0.1.0",
+  "description": "Portal B1 - portal modular (Compras, Parceiros, Relatórios) sobre o SAP Business One Service Layer",
+  "main": "server/index.js",
+  "private": true,
+  "scripts": {
+    "start": "node server/index.js",
+    "dev:mock": "MOCK=1 node server/index.js",
+    "test": "node server/test/smoke.test.js && node server/test/sl-shape.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.0"
+  }
+}

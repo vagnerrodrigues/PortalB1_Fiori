@@ -1,0 +1,23 @@
+<mvc:View controllerName="portal.b1.modules.relatorios.controller.Run"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{run>/report/title}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <Panel headerText="{i18n>repFilters}" class="sapUiResponsiveContentPadding">
+        <Text text="{run>/report/description}" class="sapUiSmallMarginBottom" />
+        <FlexBox id="params" wrap="Wrap" alignItems="End" />
+        <Button text="{i18n>repRun}" type="Emphasized" icon="sap-icon://media-play" press=".onRun" class="sapUiSmallMarginTop" />
+      </Panel>
+      <MessageStrip text="{i18n>repTruncated}" type="Warning" showIcon="true" visible="{= !!${run>/truncated} }" class="sapUiSmallMargin" />
+      <Table id="result" growing="true" growingThreshold="100" noDataText="{i18n>noData}"
+        class="sapUiResponsiveContentPadding" visible="{= !!${run>/ran} }">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{run>/info}" level="H3" />
+            <ToolbarSpacer />
+            <Button text="{i18n>repExport}" icon="sap-icon://excel-attachment" press=".onExport" enabled="{= ${run>/rows}.length > 0 }" />
+          </OverflowToolbar>
+        </headerToolbar>
+      </Table>
+    </content>
+  </Page>
+</mvc:View>

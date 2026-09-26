@@ -1,0 +1,517 @@
+'use strict';
+/**
+ * Adapter real: traduz as operações do portal para objetos NATIVOS do SAP B1 via Service Layer.
+ * Nenhum UDF/UDT é usado. Regra de aprovação = Procedimentos de Autorização nativos (OWTM/OWDD).
+ *
+ * Objetos usados:
+ *  - PurchaseRequests (OPRQ/PRQ1)   -> solicitação de compra
+ *  - Drafts (ODRF/DRF1)             -> solicitação retida por aprovação
+ *  - ApprovalRequests (OWDD/WDD1)   -> pedidos de aprovação e decisões
+ *  - DraftsService_SaveDraftToDocument -> efetivar rascunho aprovado
+ *  - Items, ProfitCenters, Warehouses, BusinessPartners, Users -> dados mestre
+ */
+const sl = require('../../core/slClient');
+
+const OBJ_PURCHASE_REQUEST = '1470000113';
+
+const q = (s) => String(s || '').replace(/'/g, "''"); // escape OData string
+const enc = encodeURIComponent;
+
+// ---------- Dados mestre ----------
+async function searchItems(tenant, ctx, term) {
+  const t = enc(q(term));
+  const filter = `PurchaseItem eq 'tYES' and Valid eq 'tYES'` +
+    (term ? ` and (contains(ItemCode,'${t}') or contains(ItemName,'${t}'))` : '');
+  const r = await sl.request(tenant, ctx.cookie, 'GET',
+    `/Items?$select=ItemCode,ItemName,PurchaseUnit,InventoryUOM,DefaultWarehouse&$filter=${filter}&$top=20`);
+  return (r.value || []).map((i) => ({
+    itemCode: i.ItemCode,
+    itemName: i.ItemName,
+    uom: i.PurchaseUnit || i.InventoryUOM || '',
+    defaultWarehouse: i.DefaultWarehouse || ''
+  }));
+}
+
+/**
+ * Centro de custo da linha (CostingCode) = REGRA DE DISTRIBUIÇÃO (OOCR), não o centro de lucro (OPRC).
+ * Validado no B1 10.0: "Centr_z" (centro padrão, sem regra) faz o SL devolver -2028.
+ */
+async function listCostCenters(tenant, ctx) {
+  try {
+    const rows = await sl.getAll(tenant, ctx.cookie,
+      `/DistributionRules?$select=FactorCode,FactorDescription,InWhichDimension,Active&$filter=InWhichDimension eq 1 and Active eq 'tYES'`, 2000);
+    return rows.filter((r) => r.FactorCode !== 'Centr_z')
+      .map((r) => ({ code: r.FactorCode, name: r.FactorDescription || r.FactorCode }));
+  } catch (_) {
+    const rows = await sl.getAll(tenant, ctx.cookie,
+      `/ProfitCenters?$select=CenterCode,CenterName&$filter=InWhichDimension eq 1 and Active eq 'tYES'`, 2000);
+    return rows.filter((c) => c.CenterCode !== 'Centr_z').map((c) => ({ code: c.CenterCode, name: c.CenterName }));
+  }
+}
+
+async function listWarehouses(tenant, ctx) {
+  const rows = await sl.getAll(tenant, ctx.cookie,
+    `/Warehouses?$select=WarehouseCode,WarehouseName,BusinessPlaceID&$filter=Inactive eq 'tNO'`, 2000);
+  return rows.map((w) => ({ code: w.WarehouseCode, name: w.WarehouseName, branch: w.BusinessPlaceID ?? null }));
+}
+
+/**
+ * Filiais (multi-branch / OBPL). Base sem filiais -> [] e o campo some da tela.
+ * Validado no B1 10.0: com filiais ativas, OPRQ sem BPL_IDAssignedToInvoice retorna -2028.
+ */
+async function listBranches(tenant, ctx, user) {
+  let rows;
+  try {
+    rows = await sl.getAll(tenant, ctx.cookie, `/BusinessPlaces?$select=BPLID,BPLName,Disabled&$filter=Disabled eq 'tNO'`);
+  } catch (e) {
+    return []; // filiais não habilitadas na empresa
+  }
+  let allowed = null; // filiais atribuídas ao usuário (OUSR > Filiais), quando o SL expõe
+  try {
+    const u = await sl.request(tenant, ctx.cookie, 'GET',
+      `/Users?$select=UserBranchAssignment&$filter=UserCode eq '${enc(q(user.userCode))}'`);
+    const list = ((u.value || [])[0] || {}).UserBranchAssignment;
+    if (Array.isArray(list) && list.length) allowed = list.map((b) => b.BPLID);
+  } catch (_) { /* campo indisponível nesta versão: mostra todas */ }
+  return rows
+    .filter((b) => !allowed || allowed.includes(b.BPLID))
+    .map((b) => ({ id: b.BPLID, name: b.BPLName }));
+}
+
+/** Série de numeração da Solicitação de compra vinculada à filial (OB1 multi-filial). */
+const seriesCache = new Map();
+async function seriesForBranch(tenant, ctx, branchId) {
+  const key = tenant.id;
+  let list = seriesCache.get(key);
+  if (!list) {
+    try {
+      const r = await sl.request(tenant, ctx.cookie, 'POST', '/SeriesService_GetDocumentSeries',
+        { DocumentTypeParams: { Document: OBJ_PURCHASE_REQUEST } });
+      list = r.value || [];
+    } catch (_) { list = []; }
+    seriesCache.set(key, list);
+    setTimeout(() => seriesCache.delete(key), 30 * 60 * 1000).unref();
+  }
+  const open = list.filter((s) => s.Locked !== 'tYES');
+  const ofBranch = open.find((s) => Number(s.BPLID) === Number(branchId));
+  const shared = open.find((s) => s.BPLID === null || s.BPLID === undefined); // série sem filial (vale para todas)
+  return (ofBranch || shared || {}).Series;
+}
+
+async function searchVendors(tenant, ctx, term) {
+  const t = enc(q(term));
+  const filter = `CardType eq 'cSupplier' and Valid eq 'tYES'` +
+    (term ? ` and (contains(CardCode,'${t}') or contains(CardName,'${t}'))` : '');
+  const r = await sl.request(tenant, ctx.cookie, 'GET',
+    `/BusinessPartners?$select=CardCode,CardName&$filter=${filter}&$top=20`);
+  return (r.value || []).map((b) => ({ cardCode: b.CardCode, cardName: b.CardName }));
+}
+
+// ---------- Solicitação de compra ----------
+/**
+ * Monta a Solicitação de compra (OPRQ).
+ *  - itens (Compras):  DocType dDocument_Items, linhas com ItemCode/Quantity
+ *  - serviço (Despesas): DocType dDocument_Service, linhas com descrição + conta contábil + valor
+ */
+function toSLPurchaseRequest(user, p, series) {
+  const service = p.docType === 'service';
+  return {
+    DocType: service ? 'dDocument_Service' : undefined,
+    BPL_IDAssignedToInvoice: p.branch ? Number(p.branch) : undefined,
+    Series: series,
+    ReqType: 12, // 12 = Usuário (171 = Funcionário)
+    Requester: user.userCode,
+    // Sem e-mail no usuário B1, desliga o aviso por e-mail; senão o B1 recusa (1470000454 - OPRQ.Email)
+    RequesterEmail: user.email || undefined,
+    SendNotification: user.email ? 'tYES' : 'tNO',
+    RequesterDepartment: user.department ?? undefined,
+    RequriedDate: p.requiredDate, // sic: nome oficial do campo no DI/SL
+    DocDate: p.docDate || undefined,
+    Comments: p.comments || undefined,
+    AttachmentEntry: p.attachmentEntry || undefined,
+    DocumentLines: p.lines.map((l) => (service ? {
+      ItemDescription: String(l.description || '').slice(0, 100),
+      AccountCode: l.accountCode,
+      LineTotal: Number(l.amount),
+      RequiredDate: l.date || p.requiredDate,
+      CostingCode: l.costCenter || undefined,
+      FreeText: l.freeText || undefined
+    } : {
+      ItemCode: l.itemCode,
+      Quantity: Number(l.quantity),
+      UnitPrice: l.unitPrice ? Number(l.unitPrice) : undefined,
+      RequiredDate: l.requiredDate || p.requiredDate,
+      CostingCode: l.costCenter || undefined,
+      WarehouseCode: l.warehouse || undefined,
+      LineVendor: l.vendor || undefined,
+      FreeText: l.freeText || undefined
+    }))
+  };
+}
+
+async function lastDraftEntry(tenant, ctx) {
+  const r = await sl.request(tenant, ctx.cookie, 'GET',
+    `/Drafts?$select=DocEntry&$filter=DocObjectCode eq 'oPurchaseRequest'&$orderby=DocEntry desc&$top=1`);
+  return ((r.value || [])[0] || {}).DocEntry || 0;
+}
+
+async function draftsCreatedAfter(tenant, ctx, entry) {
+  const r = await sl.request(tenant, ctx.cookie, 'GET',
+    `/Drafts?$select=DocEntry,DocNum,Requester&$filter=DocObjectCode eq 'oPurchaseRequest' and DocEntry gt ${Number(entry)}&$orderby=DocEntry desc&$top=20`);
+  return r.value || [];
+}
+
+/**
+ * Cria a solicitação. Se um Procedimento de Autorização se aplica, o B1 grava rascunho (ODRF) +
+ * pedido de aprovação (OWDD). Nesse caso o Service Layer (validado no B1 10.0, SL 1000321) responde
+ * com ERRO "No matching records found (ODBC -2028)" em vez de sucesso — o rascunho foi criado.
+ * Por isso: foto do último rascunho antes do POST; se o POST falhar e surgir um rascunho novo deste
+ * usuário, é aprovação pendente. Sem rascunho novo, o erro é real e sobe para a tela.
+ */
+async function createPurchaseRequest(tenant, ctx, user, payload) {
+  const series = payload.branch ? await seriesForBranch(tenant, ctx, Number(payload.branch)) : undefined;
+  const body = toSLPurchaseRequest(user, payload, series);
+  const before = await lastDraftEntry(tenant, ctx);
+  let postError = null;
+  try {
+    const doc = await sl.request(tenant, ctx.cookie, 'POST', '/PurchaseRequests', body);
+    if (doc && doc.DocEntry) {
+      return { source: 'doc', entry: doc.DocEntry, docNum: doc.DocNum, status: 'OPEN' };
+    }
+  } catch (e) {
+    postError = e;
+  }
+  const created = await draftsCreatedAfter(tenant, ctx, before);
+  const mine = created.find((d) => d.Requester === user.userCode) || (created.length === 1 ? created[0] : null);
+  if (mine) return { source: 'draft', entry: mine.DocEntry, docNum: mine.DocNum, status: 'PENDING' };
+  if (postError) {
+    // Registro técnico para diagnóstico (sem dados sensíveis): o que foi enviado e o que o B1 respondeu
+    console.error('[compras] POST PurchaseRequests recusado:', postError.message, JSON.stringify({ ...body, RequesterEmail: body.RequesterEmail ? '***' : undefined }));
+    throw postError;
+  }
+  throw new sl.SLError(500, 'APPROVAL', 'O B1 não confirmou a criação da solicitação. Verifique no SAP antes de enviar de novo.');
+}
+
+function mapApprovalStatus(s) {
+  return ({
+    arsPending: 'PENDING',
+    arsApproved: 'APPROVED',
+    // status da decisão de cada aprovador (ApprovalRequestLines): enum "ard*"
+    ardPending: 'PENDING',
+    ardApproved: 'APPROVED',
+    ardNotApproved: 'REJECTED',
+    arsNotApproved: 'REJECTED',
+    arsGenerated: 'GENERATED',
+    arsGeneratedByAuthorizer: 'GENERATED',
+    arsCancelled: 'CANCELLED'
+  })[s] || 'PENDING';
+}
+
+function mapDocStatus(d) {
+  if (d.Cancelled === 'tYES') return 'CANCELLED';
+  return d.DocumentStatus === 'bost_Close' ? 'CLOSED' : 'OPEN';
+}
+
+/**
+ * Formato real do OWDD no SL (validado no B1 10.0, SL 1000321):
+ *   IsDraft: "Y" | DraftEntry: nº do rascunho (ODRF) | ObjectEntry: null enquanto é rascunho
+ *   Linhas: { StageCode, UserID, Status: "ardPending" | "ardApproved" | "ardNotApproved" }
+ */
+const draftKey = (a) => Number(a.DraftEntry ?? a.ObjectEntry);
+const isDraftFlag = (v) => v === 'Y' || v === 'tYES' || v === true;
+
+// ---------- Leitura do rascunho (com fallback) ----------
+// O aprovador pode não ter permissão para ler o rascunho de outro usuário via /Drafts.
+// Fallback 1: SQLQueries em ODRF/DRF1. Fallback 2: dados do próprio pedido de aprovação.
+const sqlQuery = require('../../core/sqlQuery');
+const DRAFT_HDR = {
+  code: 'PB_DRAFT_HDR', name: 'Portal B1 - cabecalho de rascunho',
+  sql: 'SELECT T0."DocEntry", T0."DocNum", T0."DocType", T0."DocDate", T0."ReqDate", T0."DocTotal", T0."DocCur", T0."ReqName", T0."Requester", T0."Comments", T0."AtcEntry" ' +
+       'FROM "ODRF" T0 WHERE T0."DocEntry" = :entry'
+};
+const DRAFT_LINES = {
+  code: 'PB_DRAFT_LIN', name: 'Portal B1 - linhas de rascunho',
+  sql: 'SELECT T0."LineNum", T0."ItemCode", T0."Dscription", T0."Quantity", T0."unitMsr", T0."Price", T0."LineTotal", ' +
+       'T0."PQTReqDate", T0."OcrCode", T0."WhsCode", T0."LineVendor", T0."FreeTxt", T0."AcctCode" FROM "DRF1" T0 WHERE T0."DocEntry" = :entry ORDER BY T0."LineNum"'
+};
+const warned = new Set();
+
+// OPRQ/ODRF de solicitação não expõe DocTotal no SL (B1 10.0: "Property 'DocTotal' of 'Document' is invalid").
+// Total = soma das linhas.
+const docTotal = (d) => (d.DocTotal !== undefined && d.DocTotal !== null)
+  ? d.DocTotal
+  : (d.DocumentLines || []).reduce((acc, l) => acc + (Number(l.LineTotal) || 0), 0);
+
+async function readDraft(tenant, ctx, entry, withLines) {
+  try {
+    return await sl.request(tenant, ctx.cookie, 'GET', withLines ? `/Drafts(${Number(entry)})`
+      : `/Drafts(${Number(entry)})?$select=DocEntry,DocNum,DocType,DocDate,RequriedDate,DocCurrency,Requester,RequesterName,Comments,AttachmentEntry,DocumentLines`);
+  } catch (e) {
+    if (!warned.has(tenant.id)) { warned.add(tenant.id); console.error(`[compras] leitura /Drafts(${entry}) recusada: ${e.message} — usando SQLQueries`); }
+  }
+  try {
+    const h = (await sqlQuery.run(tenant, ctx, DRAFT_HDR, { entry: Number(entry) }, 1)).rows[0];
+    if (!h) return null;
+    const lines = withLines ? (await sqlQuery.run(tenant, ctx, DRAFT_LINES, { entry: Number(entry) }, 200)).rows : [];
+    return {
+      DocEntry: h.DocEntry, DocNum: h.DocNum, DocDate: h.DocDate, RequriedDate: h.ReqDate, DocTotal: h.DocTotal,
+      DocCurrency: h.DocCur, Requester: h.Requester, RequesterName: h.ReqName, Comments: h.Comments,
+      DocType: h.DocType === 'S' ? 'dDocument_Service' : 'dDocument_Items', AttachmentEntry: h.AtcEntry || null,
+      DocumentLines: lines.map((l) => ({
+        LineNum: l.LineNum, ItemCode: l.ItemCode, ItemDescription: l.Dscription, Quantity: l.Quantity, MeasureUnit: l.unitMsr,
+        UnitPrice: l.Price, LineTotal: l.LineTotal, RequiredDate: l.PQTReqDate, CostingCode: l.OcrCode,
+        WarehouseCode: l.WhsCode, LineVendor: l.LineVendor, FreeText: l.FreeTxt, AccountCode: l.AcctCode
+      }))
+    };
+  } catch (e) {
+    console.error(`[compras] leitura do rascunho ${entry} via SQLQueries falhou: ${e.message}`);
+    return null;
+  }
+}
+
+const userNames = new Map();
+async function userName(tenant, ctx, internalKey) {
+  const key = `${tenant.id}:${internalKey}`;
+  if (userNames.has(key)) return userNames.get(key);
+  let name = '';
+  try {
+    const r = await sl.request(tenant, ctx.cookie, 'GET', `/Users?$select=UserName,UserCode&$filter=InternalKey eq ${Number(internalKey)}`);
+    const u = (r.value || [])[0];
+    name = u ? (u.UserName || u.UserCode) : '';
+  } catch (_) { /* sem permissão */ }
+  userNames.set(key, name);
+  return name;
+}
+
+async function approvalsForDrafts(tenant, ctx, filterExtra) {
+  const extra = String(filterExtra || '').replace(/^\s*and\s+/i, '');
+  const rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests${extra ? `?$filter=${extra}` : ''}`, 1000);
+  const byDraft = new Map();
+  // Depois de gerado o documento, o OWDD passa a IsDraft "N" e ObjectEntry = documento criado;
+  // DraftEntry continua apontando o rascunho de origem -> não filtrar por IsDraft.
+  rows.filter((a) => String(a.ObjectType) === OBJ_PURCHASE_REQUEST && (a.DraftEntry !== null && a.DraftEntry !== undefined || isDraftFlag(a.IsDraft)))
+    .forEach((a) => byDraft.set(draftKey(a), a));
+  return byDraft;
+}
+
+async function listMyRequests(tenant, ctx, user, kind) {
+  const u = enc(q(user.userCode));
+  const sel = '$select=DocEntry,DocNum,DocType,DocDate,RequriedDate,DocCurrency,DocumentStatus,Cancelled,Comments,AttachmentEntry,DocumentLines';
+  const [docs, drafts, approvals] = await Promise.all([
+    sl.getAll(tenant, ctx.cookie, `/PurchaseRequests?${sel}&$filter=Requester eq '${u}'&$orderby=DocEntry desc`, 100),
+    sl.getAll(tenant, ctx.cookie, `/Drafts?${sel}&$filter=DocObjectCode eq 'oPurchaseRequest' and Requester eq '${u}'&$orderby=DocEntry desc`, 100),
+    approvalsForDrafts(tenant, ctx, ` and OriginatorID eq ${Number(user.internalKey)}`)
+  ]);
+  const out = [];
+  drafts.forEach((d) => {
+    const a = approvals.get(d.DocEntry);
+    const status = a ? mapApprovalStatus(a.Status) : 'DRAFT';
+    if (status === 'GENERATED') return; // já virou documento
+    out.push(summary('draft', d, status, a));
+  });
+  docs.forEach((d) => out.push(summary('doc', d, mapDocStatus(d))));
+  const want = kind === 'service' ? 'service' : kind === 'items' ? 'items' : null;
+  return out.filter((x) => !want || x.docType === want).sort((a, b) => String(b.docDate).localeCompare(String(a.docDate)));
+}
+
+const kindOf = (d) => (d.DocType === 'dDocument_Service' ? 'service' : 'items');
+
+function summary(source, d, status, approval) {
+  return {
+    source,
+    docType: kindOf(d),
+    entry: d.DocEntry,
+    docNum: d.DocNum,
+    docDate: d.DocDate,
+    requiredDate: d.RequriedDate,
+    total: docTotal(d),
+    currency: d.DocCurrency,
+    comments: d.Comments || '',
+    status,
+    approvalCode: approval ? approval.Code : null
+  };
+}
+
+async function getRequest(tenant, ctx, source, entry) {
+  let approval = null;
+  if (source === 'draft') {
+    const map = await approvalsForDrafts(tenant, ctx, ` and DraftEntry eq ${Number(entry)}`);
+    approval = map.get(Number(entry)) || null;
+  }
+  let d = source === 'draft'
+    ? await readDraft(tenant, ctx, entry, true)
+    : await sl.request(tenant, ctx.cookie, 'GET', `/PurchaseRequests(${Number(entry)})`);
+  if (!d) {
+    if (!approval) throw new sl.SLError(404, 'NOT_FOUND', 'Rascunho não encontrado ou sem permissão de leitura');
+    d = { DocEntry: Number(entry), DocDate: approval.CreationDate, RequesterName: await userName(tenant, ctx, approval.OriginatorID), Comments: approval.Remarks || '', DocumentLines: [] };
+  }
+  let generated = null;
+  const ap = approval && mapApproval(approval);
+  if (ap && ap.generatedEntry) {
+    try {
+      const g = await sl.request(tenant, ctx.cookie, 'GET', `/PurchaseRequests(${ap.generatedEntry})?$select=DocEntry,DocNum`);
+      generated = { entry: g.DocEntry, docNum: g.DocNum };
+    } catch (_) { generated = { entry: ap.generatedEntry, docNum: null }; }
+  }
+  return {
+    source,
+    generated,
+    docType: kindOf(d),
+    attachmentEntry: d.AttachmentEntry || null,
+    entry: d.DocEntry,
+    docNum: d.DocNum,
+    docDate: d.DocDate,
+    requiredDate: d.RequriedDate,
+    requester: d.Requester,
+    requesterName: d.RequesterName,
+    total: docTotal(d),
+    currency: d.DocCurrency,
+    comments: d.Comments || '',
+    status: source === 'draft' ? (approval ? mapApprovalStatus(approval.Status) : 'DRAFT') : mapDocStatus(d),
+    approval: approval && mapApproval(approval),
+    lines: (d.DocumentLines || []).map((l) => ({
+      lineNum: l.LineNum,
+      itemCode: l.ItemCode,
+      itemName: l.ItemDescription,
+      quantity: l.Quantity,
+      uom: l.UoMCode || l.MeasureUnit || '',
+      unitPrice: l.UnitPrice ?? l.Price,
+      lineTotal: l.LineTotal,
+      requiredDate: l.RequiredDate,
+      costCenter: l.CostingCode,
+      warehouse: l.WarehouseCode,
+      vendor: l.LineVendor,
+      freeText: l.FreeText,
+      accountCode: l.AccountCode,
+      lineStatus: l.LineStatus
+    }))
+  };
+}
+
+function mapApproval(a) {
+  return {
+    code: a.Code,
+    status: mapApprovalStatus(a.Status),
+    currentStage: a.CurrentStage,
+    originatorId: a.OriginatorID,
+    createdAt: a.CreationDate,
+    remarks: a.Remarks || '',
+    draftEntry: draftKey(a),
+    generatedEntry: a.DraftEntry !== null && a.DraftEntry !== undefined && a.ObjectEntry ? Number(a.ObjectEntry) : null,
+    steps: (a.ApprovalRequestLines || []).map((l) => ({
+      stage: l.StageCode,
+      userId: l.UserID,
+      status: mapApprovalStatus(l.Status),
+      remarks: l.Remarks || '',
+      date: l.UpdateDate || null
+    }))
+  };
+}
+
+// ---------- Aprovação ----------
+const APPROVAL_SEL = '$select=Code,ObjectType,IsDraft,Status,CurrentStage,DraftEntry,ObjectEntry,OriginatorID,CreationDate,Remarks,ApprovalRequestLines';
+
+async function pendingForUser(tenant, ctx, user) {
+  let rows;
+  try {
+    rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?${APPROVAL_SEL}&$filter=Status eq 'arsPending'`, 2000);
+  } catch (_) { // versão do SL que não aceita $select nesses campos
+    rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?$filter=Status eq 'arsPending'`, 2000);
+  }
+  const isPR = (a) => String(a.ObjectType) === OBJ_PURCHASE_REQUEST && isDraftFlag(a.IsDraft);
+  // Linhas (WDD1) usam o enum de decisão "ardPending"; aceita também "ars*".
+  const isPending = (st) => /Pending$/i.test(String(st || ''));
+  const myLine = (a, stageOnly) => (a.ApprovalRequestLines || []).some((l) =>
+    Number(l.UserID) === Number(user.internalKey) && isPending(l.Status) &&
+    (!stageOnly || a.CurrentStage === undefined || a.CurrentStage === null || Number(l.StageCode) === Number(a.CurrentStage)));
+  return rows.filter((a) => isPR(a) && myLine(a, true));
+}
+
+/** Contagem rápida de "Minhas solicitações" (abertas + em aprovação) via $count, sem ler documentos. */
+async function countMyRequests(tenant, ctx, user) {
+  const u = enc(q(user.userCode));
+  const count = async (path) => Number(await sl.request(tenant, ctx.cookie, 'GET', path)) || 0;
+  const open = await count(`/PurchaseRequests/$count?$filter=Requester eq '${u}' and DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'`);
+  const flow = `OriginatorID eq ${Number(user.internalKey)} and (Status eq 'arsPending' or Status eq 'arsApproved')`;
+  let inApproval;
+  try {
+    inApproval = await count(`/ApprovalRequests/$count?$filter=${flow} and ObjectType eq '${OBJ_PURCHASE_REQUEST}'`);
+  } catch (_) {
+    const rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?$select=Code,ObjectType&$filter=${flow}`, 2000);
+    inApproval = rows.filter((a) => String(a.ObjectType) === OBJ_PURCHASE_REQUEST).length;
+  }
+  return open + inApproval;
+}
+
+/** Só a contagem (tile da tela inicial), sem ler os rascunhos. */
+async function countPendingApprovals(tenant, ctx, user) {
+  return (await pendingForUser(tenant, ctx, user)).length;
+}
+
+async function listPendingApprovals(tenant, ctx, user) {
+  const mine = await pendingForUser(tenant, ctx, user);
+  mine.sort((a, b) => Number(b.Code) - Number(a.Code)); // mais recentes primeiro
+  // Enriquecer com cabeçalho do rascunho (nº, total, datas, solicitante)
+  const out = [];
+  for (const a of mine.slice(0, 100)) {
+    const d = (await readDraft(tenant, ctx, draftKey(a), false)) || {};
+    out.push({
+      approvalCode: a.Code,
+      draftEntry: draftKey(a),
+      docType: d.DocType ? kindOf(d) : 'items',
+      docNum: d.DocNum ?? draftKey(a),
+      docDate: d.DocDate || a.CreationDate,
+      requiredDate: d.RequriedDate,
+      requester: d.RequesterName || d.Requester || (await userName(tenant, ctx, a.OriginatorID)),
+      total: docTotal(d),
+      currency: d.DocCurrency,
+      comments: d.Comments || a.Remarks || ''
+    });
+  }
+  return out;
+}
+
+async function decide(tenant, ctx, approvalCode, approve, remarks) {
+  await sl.request(tenant, ctx.cookie, 'PATCH', `/ApprovalRequests(${Number(approvalCode)})`, {
+    ApprovalRequestDecisions: [{ Status: approve ? 'ardApproved' : 'ardNotApproved', Remarks: remarks || '' }]
+  });
+  const a = await sl.request(tenant, ctx.cookie, 'GET', `/ApprovalRequests(${Number(approvalCode)})`);
+  return mapApproval(a);
+}
+
+/** Efetiva o rascunho aprovado em Solicitação de Compra (ação do originador, como no B1). */
+/**
+ * Efetiva o rascunho aprovado em Solicitação de compra (ação do originador, como no B1).
+ * O SL trata o corpo como a versão do documento a gravar: enviar só o DocEntry faz o B1 entender
+ * que o rascunho foi alterado após a aprovação (234000127). Por isso enviamos o rascunho COMPLETO,
+ * exatamente como está gravado (sem metadados OData).
+ */
+async function finalizeDraft(tenant, ctx, draftEntry) {
+  const draft = await sl.request(tenant, ctx.cookie, 'GET', `/Drafts(${Number(draftEntry)})`);
+  const clean = (o) => {
+    if (Array.isArray(o)) return o.map(clean);
+    if (o && typeof o === 'object') {
+      const out = {};
+      Object.entries(o).forEach(([k, v]) => { if (!k.startsWith('odata.') && !k.startsWith('@odata')) out[k] = clean(v); });
+      return out;
+    }
+    return o;
+  };
+  try {
+    await sl.request(tenant, ctx.cookie, 'POST', '/DraftsService_SaveDraftToDocument', { Document: clean(draft) });
+  } catch (e) {
+    if (/234000127/.test(String(e.code)) || /updated after it was approved/i.test(e.message)) {
+      throw new sl.SLError(409, e.code,
+        'O B1 considera que este rascunho foi alterado depois da aprovação. Abra o rascunho no SAP e adicione por lá (o B1 reenviará para aprovação, se necessário).');
+    }
+    throw e;
+  }
+  return { ok: true };
+}
+
+module.exports = {
+  name: 'service-layer',
+  searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,
+  createPurchaseRequest, listMyRequests, getRequest,
+  listPendingApprovals, countPendingApprovals, countMyRequests, decide, finalizeDraft
+};

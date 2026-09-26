@@ -1,0 +1,9 @@
+<mvc:View controllerName="portal.b1.modules.relatorios.controller.List"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>repListTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <List items="{path: 'rep>/', sorter: {path: 'category', group: true}}" noDataText="{i18n>noData}">
+      <StandardListItem title="{rep>title}" description="{rep>description}" icon="sap-icon://table-view"
+        type="Navigation" press=".onOpen" />
+    </List>
+  </Page>
+</mvc:View>

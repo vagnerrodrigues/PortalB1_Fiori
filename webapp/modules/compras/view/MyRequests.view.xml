@@ -1,0 +1,25 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.MyRequests"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>myRequestsTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" press=".onRefresh" />
+      <Button icon="sap-icon://add" text="{i18n>tileNewRequest}" press=".onNew" />
+    </headerContent>
+    <subHeader>
+      <OverflowToolbar>
+        <SearchField liveChange=".onSearch" width="100%" />
+      </OverflowToolbar>
+    </subHeader>
+    <List id="list" items="{list>/}" noDataText="{i18n>noData}" growing="true" growingThreshold="30">
+      <ObjectListItem title="{parts: ['list>source', 'list>docNum', 'list>entry'], formatter: '.formatter.docTitle'}" type="Navigation" press=".onOpen"
+        number="{path: 'list>total', formatter: '.formatter.money'}">
+        <firstStatus>
+          <ObjectStatus text="{path: 'list>status', formatter: '.formatter.statusText'}"
+            state="{path: 'list>status', formatter: '.formatter.statusState'}" />
+        </firstStatus>
+        <ObjectAttribute text="{i18n>docDate}: {path: 'list>docDate', formatter: '.formatter.date'} · {i18n>requiredDate}: {path: 'list>requiredDate', formatter: '.formatter.date'}" />
+        <ObjectAttribute text="{list>comments}" visible="{= !!${list>comments}}" />
+      </ObjectListItem>
+    </List>
+  </Page>
+</mvc:View>

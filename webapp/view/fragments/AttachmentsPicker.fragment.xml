@@ -1,0 +1,17 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core" xmlns:u="sap.ui.unified">
+  <!-- Seleção de anexos (enviados ao SAP B1 como anexos nativos do documento) -->
+  <List items="{att>/files}" noDataText="{i18n>attNone}" mode="Delete" delete=".onAttachmentRemove" class="sapUiResponsiveContentPadding">
+    <headerToolbar>
+      <OverflowToolbar>
+        <Title text="{i18n>attTitle} ({= ${att>/files}.length})" level="H3" />
+        <ToolbarSpacer />
+        <u:FileUploader buttonOnly="true" multiple="true" sameFilenameAllowed="true" icon="sap-icon://attachment"
+          buttonText="{i18n>attAdd}" change=".onAttachmentPick" useMultipart="false" sendXHR="false"
+          fileType="{att>/allowed}" typeMissmatch=".onAttachmentType" />
+      </OverflowToolbar>
+    </headerToolbar>
+    <StandardListItem title="{att>name}" description="{att>sizeText}" icon="sap-icon://document" type="Inactive">
+      <customData><core:CustomData key="idx" value="{att>idx}" /></customData>
+    </StandardListItem>
+  </List>
+</core:FragmentDefinition>

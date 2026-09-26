@@ -1,0 +1,58 @@
+<mvc:View controllerName="portal.b1.modules.parceiros.controller.Detail"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{bp>/cardCode}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <ObjectHeader title="{bp>/cardName}" responsive="true"
+        number="{= ${bp>/type} === 'lead' ? '' : ${path: 'bp>/balance', formatter: '.formatter.money'} }"
+        numberUnit="{= ${bp>/type} === 'lead' ? '' : ${i18n>bpBalance} }">
+        <statuses>
+          <ObjectStatus text="{path: 'bp>/type', formatter: '.formatter.bpType'}" state="{path: 'bp>/type', formatter: '.formatter.bpTypeState'}" />
+          <ObjectStatus text="{i18n>bpInactive}" state="Error" visible="{= ${bp>/active} === false }" />
+        </statuses>
+        <ObjectAttribute title="{i18n>bpTradeName}" text="{bp>/tradeName}" />
+        <ObjectAttribute title="{i18n>bpTaxId}" text="{bp>/taxId}" />
+        <ObjectAttribute title="{i18n>bpStateReg}" text="{bp>/stateRegistration}" />
+        <ObjectAttribute title="{i18n>bpPhone}" text="{bp>/phone}" />
+        <ObjectAttribute title="{i18n>bpEmail}" text="{bp>/email}" />
+        <ObjectAttribute title="{i18n>bpCreditLimit}" text="{path: 'bp>/creditLimit', formatter: '.formatter.money'}"
+          visible="{= ${bp>/type} === 'customer' }" />
+      </ObjectHeader>
+
+      <Table items="{bp>/addresses}" headerText="{i18n>bpAddresses}" noDataText="{i18n>noData}" class="sapUiResponsiveContentPadding">
+        <columns>
+          <Column><Text text="{i18n>bpAddress}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>bpBlock}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>bpCity}" /></Column>
+          <Column width="7rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>bpZip}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <ObjectIdentifier title="{bp>street}, {bp>streetNo}" text="{bp>complement}" />
+            <Text text="{bp>block}" />
+            <Text text="{bp>city} / {bp>state}" />
+            <Text text="{bp>zipCode}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <Table items="{bp>/contacts}" headerText="{i18n>bpContacts}" noDataText="{i18n>noData}" class="sapUiResponsiveContentPadding sapUiMediumMarginTop">
+        <columns>
+          <Column><Text text="{i18n>bpContactName}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>bpPhone}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>bpEmail}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem>
+            <ObjectIdentifier title="{bp>name}" text="{bp>position}" />
+            <Link text="{bp>phone}" href="tel:{bp>phone}" />
+            <Link text="{bp>email}" href="mailto:{bp>email}" />
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <Panel headerText="{i18n>bpNotes}" visible="{= !!${bp>/notes} }" class="sapUiResponsiveContentPadding">
+        <Text text="{bp>/notes}" />
+      </Panel>
+    </content>
+  </Page>
+</mvc:View>

@@ -1,0 +1,8 @@
+<core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
+  <!-- Anexos gravados no SAP B1 (abre/baixa pelo portal) -->
+  <List items="{doc>/attachments}" headerText="{i18n>attTitle}" noDataText="{i18n>attNone}"
+    visible="{= !!${doc>/entry} }" class="sapUiResponsiveContentPadding sapUiMediumMarginTop">
+    <StandardListItem title="{doc>display}" description="{path: 'doc>date', formatter: '.formatter.date'}"
+      icon="sap-icon://attachment" type="Active" press=".onAttachmentOpen" />
+  </List>
+</core:FragmentDefinition>

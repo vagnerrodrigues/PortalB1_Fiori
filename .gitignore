@@ -1,0 +1,6 @@
+node_modules/
+config/tenants.json
+logs/
+.env
+deploy/windows/nssm.exe
+*.zip

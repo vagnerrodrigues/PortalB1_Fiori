@@ -1,0 +1,226 @@
+{
+  "_version": "2.0.0",
+  "sap.app": {
+    "id": "portal.b1",
+    "type": "application",
+    "i18n": {
+      "bundleUrl": "i18n/i18n.properties",
+      "supportedLocales": [
+        "",
+        "pt"
+      ],
+      "fallbackLocale": ""
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "applicationVersion": {
+      "version": "0.1.0"
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "rootView": {
+      "viewName": "portal.b1.view.App",
+      "type": "XML",
+      "id": "app"
+    },
+    "dependencies": {
+      "minUI5Version": "1.136.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.ui.layout": {},
+        "sap.f": {},
+        "sap.ui.unified": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "portal.b1.i18n.i18n",
+          "supportedLocales": [
+            "",
+            "pt"
+          ],
+          "fallbackLocale": ""
+        }
+      }
+    },
+    "resources": {
+      "css": [
+        {
+          "uri": "css/style.css"
+        }
+      ]
+    },
+    "routing": {
+      "config": {
+        "routerClass": "sap.m.routing.Router",
+        "type": "View",
+        "viewType": "XML",
+        "path": "portal.b1",
+        "controlId": "app",
+        "controlAggregation": "pages",
+        "bypassed": {
+          "target": "home"
+        }
+      },
+      "routes": [
+        {
+          "name": "login",
+          "pattern": "login",
+          "target": "login"
+        },
+        {
+          "name": "home",
+          "pattern": "",
+          "target": "home"
+        },
+        {
+          "name": "compras.new",
+          "pattern": "compras/nova",
+          "target": "compras.new"
+        },
+        {
+          "name": "compras.mine",
+          "pattern": "compras/minhas",
+          "target": "compras.mine"
+        },
+        {
+          "name": "compras.detail",
+          "pattern": "compras/solicitacao/{source}/{entry}:?query:",
+          "target": "compras.detail"
+        },
+        {
+          "name": "compras.approvals",
+          "pattern": "compras/aprovacoes",
+          "target": "compras.approvals"
+        },
+        {
+          "name": "despesas.new",
+          "pattern": "despesas/nova",
+          "target": "despesas.new"
+        },
+        {
+          "name": "despesas.mine",
+          "pattern": "despesas/minhas",
+          "target": "despesas.mine"
+        },
+        {
+          "name": "despesas.detail",
+          "pattern": "despesas/{source}/{entry}",
+          "target": "despesas.detail"
+        },
+        {
+          "name": "parceiros.list",
+          "pattern": "parceiros",
+          "target": "parceiros.list"
+        },
+        {
+          "name": "parceiros.new",
+          "pattern": "parceiros/novo",
+          "target": "parceiros.new"
+        },
+        {
+          "name": "parceiros.detail",
+          "pattern": "parceiros/pn/{cardCode}",
+          "target": "parceiros.detail"
+        },
+        {
+          "name": "relatorios.list",
+          "pattern": "relatorios",
+          "target": "relatorios.list"
+        },
+        {
+          "name": "relatorios.run",
+          "pattern": "relatorios/{id}",
+          "target": "relatorios.run"
+        }
+      ],
+      "targets": {
+        "login": {
+          "id": "login",
+          "name": "view.Login",
+          "level": 0
+        },
+        "home": {
+          "id": "home",
+          "name": "view.Home",
+          "level": 1
+        },
+        "compras.new": {
+          "id": "comprasNew",
+          "name": "modules.compras.view.NewRequest",
+          "level": 2
+        },
+        "compras.mine": {
+          "id": "comprasMine",
+          "name": "modules.compras.view.MyRequests",
+          "level": 2
+        },
+        "compras.approvals": {
+          "id": "comprasApprovals",
+          "name": "modules.compras.view.Approvals",
+          "level": 2
+        },
+        "compras.detail": {
+          "id": "comprasDetail",
+          "name": "modules.compras.view.Detail",
+          "level": 3
+        },
+        "parceiros.list": {
+          "id": "parceirosList",
+          "name": "modules.parceiros.view.List",
+          "level": 2
+        },
+        "parceiros.new": {
+          "id": "parceirosNew",
+          "name": "modules.parceiros.view.New",
+          "level": 3
+        },
+        "parceiros.detail": {
+          "id": "parceirosDetail",
+          "name": "modules.parceiros.view.Detail",
+          "level": 3
+        },
+        "relatorios.list": {
+          "id": "relatoriosList",
+          "name": "modules.relatorios.view.List",
+          "level": 2
+        },
+        "relatorios.run": {
+          "id": "relatoriosRun",
+          "name": "modules.relatorios.view.Run",
+          "level": 3
+        },
+        "despesas.new": {
+          "id": "despesasNew",
+          "name": "modules.despesas.view.New",
+          "level": 2
+        },
+        "despesas.mine": {
+          "id": "despesasMine",
+          "name": "modules.despesas.view.Mine",
+          "level": 2
+        },
+        "despesas.detail": {
+          "id": "despesasDetail",
+          "name": "modules.despesas.view.Detail",
+          "level": 3
+        }
+      }
+    }
+  }
+}

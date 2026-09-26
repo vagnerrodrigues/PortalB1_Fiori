@@ -1,0 +1,47 @@
+[
+  {
+    "id": "demo",
+    "name": "Empresa Demo Ltda",
+    "serviceLayerUrl": "https://seu-servidor-b1:50000/b1s/v1",
+    "companyDB": "SBODEMOBR",
+    "rejectUnauthorized": false,
+    "modules": [
+      "compras",
+      "despesas",
+      "parceiros",
+      "relatorios"
+    ],
+    "moduleAccess": {
+      "compras": {
+        "departments": []
+      },
+      "parceiros": {
+        "departments": []
+      }
+    },
+    "bpLeadSeries": null,
+    "reports": null,
+    "expenseCategories": [
+      {
+        "code": "KM",
+        "name": "Quilometragem",
+        "account": "CODIGO_DA_CONTA"
+      },
+      {
+        "code": "REF",
+        "name": "Refeição",
+        "account": "CODIGO_DA_CONTA"
+      },
+      {
+        "code": "HOSP",
+        "name": "Hospedagem",
+        "account": "CODIGO_DA_CONTA"
+      },
+      {
+        "code": "OUT",
+        "name": "Outras despesas"
+      }
+    ],
+    "expenseRequireAttachment": true
+  }
+]

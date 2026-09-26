@@ -1,0 +1,15 @@
+{
+  "productName": "Portal B1",
+  "company": "Blue Ocean",
+  "logo": "brand/minha-logo.png",
+  "logoOnDark": "brand/minha-logo-branca.png",
+  "colors": {
+    "primary": "#070070",
+    "primaryHover": "#0A0A9C",
+    "header": "#070070",
+    "headerText": "#FFFFFF",
+    "accent": "#035DD0",
+    "loginFrom": "#070070",
+    "loginTo": "#035DD0"
+  }
+}

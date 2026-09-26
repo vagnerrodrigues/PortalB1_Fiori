@@ -1,0 +1,20 @@
+<mvc:View controllerName="portal.b1.modules.despesas.controller.Mine"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>expMineTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" press=".onRefresh" />
+      <Button icon="sap-icon://add" text="{i18n>expNewTitle}" press=".onNew" />
+    </headerContent>
+    <List items="{list>/}" noDataText="{i18n>noData}" growing="true" growingThreshold="30">
+      <ObjectListItem type="Navigation" press=".onOpen"
+        title="{parts: ['list>source', 'list>docNum', 'list>entry'], formatter: '.formatter.expTitle'}"
+        number="{path: 'list>total', formatter: '.formatter.money'}">
+        <firstStatus>
+          <ObjectStatus text="{path: 'list>status', formatter: '.formatter.statusText'}" state="{path: 'list>status', formatter: '.formatter.statusState'}" />
+        </firstStatus>
+        <ObjectAttribute text="{i18n>docDate}: {path: 'list>docDate', formatter: '.formatter.date'}" />
+        <ObjectAttribute text="{list>comments}" visible="{= !!${list>comments} }" />
+      </ObjectListItem>
+    </List>
+  </Page>
+</mvc:View>

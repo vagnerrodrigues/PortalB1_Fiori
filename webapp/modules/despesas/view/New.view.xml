@@ -1,0 +1,68 @@
+<mvc:View controllerName="portal.b1.modules.despesas.controller.New"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.ui.layout.form" xmlns:core="sap.ui.core"
+  core:require="{ Float: 'sap/ui/model/type/Float' }">
+  <Page title="{i18n>expNewTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3" columnsL="1" columnsM="1">
+        <Label text="{i18n>branch}" required="true" visible="{= ${cfg>/branches}.length > 0 }" />
+        <ComboBox selectedKey="{exp>/branch}" items="{cfg>/branches}" width="22rem" visible="{= ${cfg>/branches}.length > 0 }">
+          <core:Item key="{cfg>id}" text="{cfg>name}" />
+        </ComboBox>
+        <Label text="{i18n>expPurpose}" />
+        <TextArea value="{exp>/comments}" maxLength="240" rows="2" growing="true" placeholder="{i18n>expPurposeHint}" />
+      </f:SimpleForm>
+
+      <Table id="lines" items="{exp>/lines}" class="sapUiResponsiveContentPadding">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{i18n>expItems} ({= ${exp>/lines}.length})" />
+            <ToolbarSpacer />
+            <Button text="{i18n>expAdd}" icon="sap-icon://add" press=".onAddLine" />
+          </OverflowToolbar>
+        </headerToolbar>
+        <columns>
+          <Column width="10rem"><Text text="{i18n>expDate}" /></Column>
+          <Column width="14rem"><Text text="{i18n>expCategory}" /></Column>
+          <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>expDescription}" /></Column>
+          <Column width="9rem" hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>expAmount}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>costCenter}" /></Column>
+          <Column minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>expAccount}" /></Column>
+          <Column width="3rem" />
+        </columns>
+        <items>
+          <ColumnListItem>
+            <DatePicker value="{exp>date}" valueFormat="yyyy-MM-dd" displayFormat="dd/MM/yyyy" maxDate="{exp>/maxDate}" />
+            <Select selectedKey="{exp>category}" items="{path: 'cfg>/categories', templateShareable: true}" width="100%" forceSelection="false">
+              <core:Item key="{cfg>code}" text="{cfg>name}" />
+            </Select>
+            <Input value="{exp>description}" maxLength="80" placeholder="{i18n>expDescriptionHint}" />
+            <Input value="{path: 'exp>amount', type: 'Float', formatOptions: {minFractionDigits: 2, maxFractionDigits: 2}}"
+              textAlign="End" change=".onRecalc" liveChange=".onRecalc" />
+            <ComboBox selectedKey="{exp>costCenter}" items="{path: 'cfg>/costCenters', templateShareable: true}" width="100%">
+              <core:Item key="{cfg>code}" text="{cfg>name}" />
+            </ComboBox>
+            <Input value="{exp>accountLabel}" showSuggestion="true" filterSuggests="false" startSuggestion="2"
+              suggest=".onAccountSuggest" suggestionItemSelected=".onAccountSelected"
+              visible="{parts: ['exp>category', 'cfg>/categories'], formatter: '.needsAccount'}"
+              suggestionItems="{path: 'cfg>/accountSuggest', templateShareable: true}">
+              <suggestionItems><core:ListItem key="{cfg>code}" text="{cfg>formatCode} - {cfg>name}" /></suggestionItems>
+            </Input>
+            <Button icon="sap-icon://delete" type="Transparent" press=".onRemoveLine" />
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <MessageStrip text="{i18n>expReceiptHint}" type="Information" showIcon="true" class="sapUiSmallMargin"
+        visible="{cfg>/requireAttachment}" />
+      <core:Fragment fragmentName="portal.b1.view.fragments.AttachmentsPicker" type="XML" />
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <Text text="{i18n>repTotal}:" />
+        <ObjectNumber number="{path: 'exp>/total', formatter: '.formatter.money'}" class="pcTotal" />
+        <ToolbarSpacer />
+        <Button text="{i18n>expSubmit}" type="Emphasized" icon="sap-icon://paper-plane" press=".onSubmit" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

@@ -1,0 +1,23 @@
+<mvc:View controllerName="portal.b1.controller.Login"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core">
+  <Page showHeader="false" class="pbLoginBg">
+    <FlexBox height="100%" direction="Column" alignItems="Center" justifyContent="Center">
+      <VBox class="pbLoginCard sapUiSmallMargin">
+        <Image src="{brand>/logo}" class="pbLoginLogo" alt="{brand>/company}" decorative="false" />
+        <Title text="{brand>/productName}" level="H1" titleStyle="H3" class="pbLoginTitle" />
+        <Text text="{i18n>loginTitle}" class="sapUiSmallMarginBottom sapUiTinyMarginTop" />
+        <Label text="{i18n>company}" labelFor="company" required="true" />
+        <Select id="company" width="100%" items="{login>/tenants}" selectedKey="{login>/tenantId}">
+          <core:Item key="{login>id}" text="{login>name}" />
+        </Select>
+        <Label text="{i18n>user}" labelFor="user" required="true" class="sapUiSmallMarginTop" />
+        <Input id="user" value="{login>/userName}" submit=".onLogin" autocomplete="false" />
+        <Label text="{i18n>password}" labelFor="password" required="true" class="sapUiSmallMarginTop" />
+        <Input id="password" type="Password" value="{login>/password}" submit=".onLogin" />
+        <Button text="{i18n>login}" type="Emphasized" width="100%" press=".onLogin" class="sapUiMediumMarginTop" />
+        <MessageStrip text="{i18n>demoHint}" type="Information" visible="{login>/demo}" class="sapUiSmallMarginTop" />
+      </VBox>
+      <Text text="{brand>/company} · SAP Business One" class="pbLoginFooter" />
+    </FlexBox>
+  </Page>
+</mvc:View>

@@ -21,6 +21,7 @@ param(
 )
 
 $ErrorActionPreference = "Continue"
+[Console]::OutputEncoding = [Text.Encoding]::UTF8   # acentos corretos nas mensagens do git
 function Step($msg) { Write-Host "`n==> $msg" -ForegroundColor Cyan }
 
 $repo = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path

@@ -139,7 +139,7 @@ if ((Get-Service $ServiceName).Status -ne "Running") { Start-Sleep -Seconds 3 }
 Start-Sleep -Seconds 3
 try {
   $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/health" -TimeoutSec 10 -ErrorAction Stop
-  Write-Host "`nOK: portal no ar (adapter: $($health.adapter)) em http://127.0.0.1:$Port" -ForegroundColor Green
+  Write-Host "`nOK: portal no ar (modo: $($health.mode); módulos: $($health.modules -join ', ')) em http://127.0.0.1:$Port" -ForegroundColor Green
 } catch {
   Write-Warning "O serviço não respondeu. Veja $logs\service-error.log"
   exit 1

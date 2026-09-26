@@ -1,6 +1,8 @@
 'use strict';
 /** Teste ponta a ponta do fluxo da Fase 1 usando o adapter MOCK. Rodar: npm test */
 process.env.MOCK = '1';
+process.env.SETTINGS_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'pb1-settings-'));
+process.env.PORTAL_SECRET = 'teste';
 const assert = require('assert');
 const app = require('../index');
 
@@ -102,8 +104,8 @@ async function main() {
     ok('comercial vê Despesas + Parceiros + Relatórios; Compras bloqueado (403)');
 
     const meA = await call('GET', '/api/me', null, apr);
-    assert.strictEqual(meA.json.modules.length, 4);
-    ok('superusuário vê todos os módulos');
+    assert.strictEqual(meA.json.modules.length, 5);
+    ok('superusuário vê todos os módulos (inclui Configurações)');
 
     // ---------- Parceiros ----------
     const bps = await call('GET', '/api/m/parceiros?q=alfa', null, com);
@@ -208,6 +210,59 @@ async function main() {
     assert.strictEqual(expDet.json.lines[1].accountCode, '4.1.1.01.001');
     assert.strictEqual(expDet.json.attachments.length, 1);
     ok('detalhe da despesa com conta contábil e comprovante');
+
+    // ---------- Configurações e e-mail ----------
+    const mailer = require('../core/mailer');
+    assert.strictEqual((await call('GET', '/api/m/admin/settings', null, rc)).status, 403);
+    ok('Configurações bloqueadas para não-superusuário');
+
+    const badCfg = await call('PUT', '/api/m/admin/settings', { email: { enabled: true, host: '', fromAddress: 'x' } }, apr);
+    assert.strictEqual(badCfg.status, 400);
+    ok('validação das configurações de e-mail');
+
+    const saved = await call('PUT', '/api/m/admin/settings', {
+      general: { productName: 'Portal Silcon', portalUrl: 'https://portal.silcon.com.br/' },
+      email: { enabled: true, host: 'outbox', port: 587, security: 'starttls', user: 'portal@silcon.com.br', password: 'segredo123', fromName: 'Portal Silcon', fromAddress: 'portal@silcon.com.br' }
+    }, apr);
+    assert.strictEqual(saved.status, 200);
+    assert.strictEqual(saved.json.email.hasPassword, true);
+    assert.ok(!('password' in saved.json.email) && !('passwordEnc' in saved.json.email));
+    const rawFile = require('fs').readFileSync(require('path').join(process.env.SETTINGS_DIR, 'demo.json'), 'utf8');
+    assert.ok(!rawFile.includes('segredo123'));
+    ok('configurações salvas; senha SMTP criptografada e nunca devolvida');
+
+    const brandT = await call('GET', '/api/branding?tenant=demo');
+    assert.strictEqual(brandT.json.productName, 'Portal Silcon');
+    const meN = await call('GET', '/api/me', null, rc);
+    assert.strictEqual(meN.json.branding.productName, 'Portal Silcon');
+    const brandG = await call('GET', '/api/branding');
+    assert.strictEqual(brandG.json.productName, 'Portal B1');
+    ok('nome do portal por empresa (login e sessão), sem alterar o padrão global');
+
+    const test = await call('POST', '/api/m/admin/settings/test-email', { to: 'ti@silcon.com.br' }, apr);
+    assert.strictEqual(test.status, 200);
+    assert.ok(mailer.sent.some((m) => m.subject.includes('Teste de e-mail') && m.to.includes('ti@silcon.com.br')));
+    ok('e-mail de teste enviado');
+
+    const before = mailer.sent.length;
+    const big2 = await call('POST', '/api/m/compras/purchase-requests', {
+      requiredDate: future, lines: [{ itemCode: 'TI-0501', quantity: 3, unitPrice: 900 }]
+    }, rc);
+    assert.strictEqual(big2.json.source, 'draft');
+    await new Promise((r) => setTimeout(r, 300));
+    const toApprover = mailer.sent.slice(before).find((m) => m.subject.startsWith('Aprovação pendente'));
+    assert.ok(toApprover && toApprover.to.includes('carlos@demo.com'));
+    const html = require('fs').readFileSync(toApprover.file, 'utf8');
+    assert.ok(html.includes('https://portal.silcon.com.br/#/compras/solicitacao/draft/'));
+    ok('aprovador notificado por e-mail com link direto');
+
+    const pend2 = await call('GET', '/api/m/compras/approvals', null, apr);
+    const code2 = pend2.json.find((x) => x.draftEntry === big2.json.entry).approvalCode;
+    await call('POST', `/api/m/compras/approvals/${code2}/decision`, { approve: false, remarks: 'Sem orçamento' }, apr);
+    await new Promise((r) => setTimeout(r, 300));
+    const toReq = mailer.sent.slice(before).find((m) => m.subject.includes('reprovada'));
+    assert.ok(toReq && toReq.to.includes('ana@demo.com'));
+    ok('solicitante notificado da reprovação');
 
     console.log('\nTodos os testes passaram.');
   } finally {

@@ -5,6 +5,7 @@
  */
 const express = require('express');
 const attachments = require('../../core/attachments');
+const notify = require('../../core/notify');
 
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s)) && !isNaN(Date.parse(s));
 
@@ -102,6 +103,7 @@ module.exports = {
       const result = await b1.createPurchaseRequest(req.tenant, req.session.ctx, req.session.user,
         { ...req.body, attachments: undefined, docType: 'items', attachmentEntry });
       audit(req, 'PR_CREATE', result);
+      if (result.source === 'draft') notify.approvalRequested(req, b1, result.entry);
       res.status(201).json(result);
     }));
 
@@ -133,6 +135,7 @@ module.exports = {
       if (draft.status !== 'APPROVED') return res.status(400).json({ error: 'Solicitação ainda não aprovada' });
       const out = await b1.finalizeDraft(req.tenant, req.session.ctx, Number(req.params.entry));
       audit(req, 'PR_FINALIZE', { draftEntry: Number(req.params.entry) });
+      notify.generated(req, b1, Number(req.params.entry));
       res.json(out);
     }));
 
@@ -147,6 +150,7 @@ module.exports = {
       if (!approve && !String(remarks || '').trim()) return res.status(400).json({ error: 'Informe o motivo da reprovação' });
       const out = await b1.decide(req.tenant, req.session.ctx, Number(req.params.code), approve, String(remarks || '').slice(0, 254));
       audit(req, approve ? 'PR_APPROVE' : 'PR_REJECT', { approvalCode: Number(req.params.code) });
+      if (out && out.draftEntry) notify.decided(req, b1, Number(out.draftEntry), approve, String(remarks || ''));
       res.json(out);
     }));
 

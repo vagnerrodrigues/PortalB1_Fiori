@@ -46,6 +46,22 @@ Categoria sem `account` faz o usuário escolher a conta contábil na tela. As ap
 - Os demais usuários são filtrados por **Departamento** e/ou código de usuário (`moduleAccess` no `tenants.json`).
 - A API bloqueia o módulo (403) e a tela também. Toda ação roda com o usuário B1 da pessoa, então as autorizações do próprio B1 continuam valendo.
 
+## Configurações do portal (tile "Configurações do portal")
+
+Só aparece para **superusuário do B1** (ou para quem estiver em `moduleAccess.admin.users`). É por empresa e fica em `config/settings/<empresa>.json`.
+
+| Aba | O que configura |
+|---|---|
+| **Geral** | Nome do portal (substitui "Portal B1" no login, no cabeçalho e nos e-mails) e o endereço público, usado nos links dos e-mails |
+| **E-mail** | Servidor SMTP com os presets Microsoft 365 (smtp.office365.com:587 STARTTLS), Gmail (smtp.gmail.com:465 SSL) e Outro. Tem o botão **Salvar e enviar teste** |
+| **Notificações** | Liga/desliga cada etapa: aprovação pendente (vai para o aprovador), aprovada, reprovada e gerada no SAP (vão para o solicitante) |
+
+- Os destinatários vêm do campo **E-mail do usuário no B1** (OUSR). Usuário sem e-mail não recebe.
+- A senha do SMTP fica gravada criptografada (AES-256-GCM) com a chave `config/secret.key`, que é gerada na primeira execução. **Faça backup desse arquivo**: sem ele, será preciso digitar a senha de novo.
+- O envio acontece em segundo plano. Se o e-mail falhar, a operação no B1 não é afetada, e a falha vai para o log e para a auditoria (`EMAIL`).
+- No Microsoft 365, a conta remetente precisa ter o *SMTP AUTH* habilitado. No Gmail, é preciso usar uma *senha de app*.
+- No modo demo (mock), os e-mails não saem: eles ficam em `logs/outbox/*.html`.
+
 ## Rodar a demo (sem SAP)
 
 ```bash

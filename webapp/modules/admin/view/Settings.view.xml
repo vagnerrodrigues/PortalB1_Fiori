@@ -1,0 +1,106 @@
+<mvc:View controllerName="portal.b1.modules.admin.controller.Settings"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.ui.layout.form" xmlns:core="sap.ui.core">
+  <Page title="{i18n>admTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <IconTabBar id="tabs" expandable="false" stretchContentHeight="false" class="sapUiResponsiveContentPadding">
+        <items>
+          <!-- ===== Geral ===== -->
+          <IconTabFilter key="general" text="{i18n>admGeneral}" icon="sap-icon://settings">
+            <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3" columnsL="1" columnsM="1">
+              <Label text="{i18n>admProductName}" />
+              <Input value="{cfg>/general/productName}" maxLength="40" placeholder="{cfg>/defaultProductName}" />
+              <Label text="" />
+              <Text text="{i18n>admProductNameHint}" class="sapUiTinyMarginBottom" />
+              <Label text="{i18n>admPortalUrl}" />
+              <Input value="{cfg>/general/portalUrl}" placeholder="https://portal.suaempresa.com.br" type="Url" />
+              <Label text="" />
+              <Text text="{i18n>admPortalUrlHint}" />
+            </f:SimpleForm>
+          </IconTabFilter>
+
+          <!-- ===== E-mail ===== -->
+          <IconTabFilter key="email" text="{i18n>admEmail}" icon="sap-icon://email">
+            <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3" columnsL="1" columnsM="1">
+              <Label text="{i18n>admEmailEnabled}" />
+              <Switch state="{cfg>/email/enabled}" customTextOn="Sim" customTextOff="Não" />
+              <Label text="{i18n>admPreset}" />
+              <HBox wrap="Wrap">
+                <Button text="Microsoft 365 / Outlook" press=".onPreset('o365')" class="sapUiTinyMarginEnd sapUiTinyMarginBottom" />
+                <Button text="Gmail / Google Workspace" press=".onPreset('gmail')" class="sapUiTinyMarginEnd sapUiTinyMarginBottom" />
+                <Button text="{i18n>admPresetOther}" press=".onPreset('other')" class="sapUiTinyMarginBottom" />
+              </HBox>
+              <Label text="{i18n>admHost}" required="{cfg>/email/enabled}" />
+              <Input value="{cfg>/email/host}" placeholder="smtp.office365.com" />
+              <Label text="{i18n>admPort} / {i18n>admSecurity}" />
+              <Input value="{path: 'cfg>/email/port', type: 'Integer', formatOptions: {groupingEnabled: false}}" width="8rem" core:require="{ Integer: 'sap/ui/model/type/Integer' }">
+                <layoutData><l:GridData xmlns:l="sap.ui.layout" span="L2 M3 S4" /></layoutData>
+              </Input>
+              <Select selectedKey="{cfg>/email/security}">
+                <core:Item key="starttls" text="STARTTLS (587)" />
+                <core:Item key="ssl" text="SSL/TLS (465)" />
+                <core:Item key="none" text="{i18n>admSecurityNone}" />
+              </Select>
+              <Label text="{i18n>admUser}" />
+              <Input value="{cfg>/email/user}" placeholder="portal@suaempresa.com.br" autocomplete="false" />
+              <Label text="{i18n>admPassword}" />
+              <Input value="{cfg>/password}" type="Password" autocomplete="false"
+                placeholder="{= ${cfg>/email/hasPassword} ? ${i18n>admPasswordKept} : '' }" />
+              <Label text="{i18n>admFromName}" />
+              <Input value="{cfg>/email/fromName}" maxLength="60" placeholder="{cfg>/general/productName}" />
+              <Label text="{i18n>admFromAddress}" required="{cfg>/email/enabled}" />
+              <Input value="{cfg>/email/fromAddress}" type="Email" placeholder="portal@suaempresa.com.br" />
+              <Label text="{i18n>admReplyTo}" />
+              <Input value="{cfg>/email/replyTo}" type="Email" />
+              <Label text="" />
+              <CheckBox text="{i18n>admTlsCheck}" selected="{cfg>/email/rejectUnauthorized}" />
+            </f:SimpleForm>
+            <Panel headerText="{i18n>admTest}" class="sapUiSmallMarginTop">
+              <HBox alignItems="Center" wrap="Wrap">
+                <Input value="{cfg>/testTo}" type="Email" width="20rem" placeholder="{session>/user/email}" class="sapUiTinyMarginEnd" />
+                <Button text="{i18n>admTestSend}" icon="sap-icon://paper-plane" press=".onTestEmail" />
+              </HBox>
+              <Text text="{i18n>admTestHint}" class="sapUiTinyMarginTop" />
+            </Panel>
+          </IconTabFilter>
+
+          <!-- ===== Notificações ===== -->
+          <IconTabFilter key="notify" text="{i18n>admNotify}" icon="sap-icon://bell">
+            <MessageStrip text="{i18n>admNotifyHint}" type="Information" showIcon="true" class="sapUiSmallMarginBottom" />
+            <List>
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMargin">
+                  <VBox><Text text="{i18n>admEvApproval}" class="sapUiTinyMarginBottom" /><Label text="{i18n>admEvApprovalTo}" /></VBox>
+                  <Switch state="{cfg>/notify/approvalRequested}" />
+                </HBox>
+              </CustomListItem>
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMargin">
+                  <VBox><Text text="{i18n>admEvApproved}" class="sapUiTinyMarginBottom" /><Label text="{i18n>admEvToRequester}" /></VBox>
+                  <Switch state="{cfg>/notify/approved}" />
+                </HBox>
+              </CustomListItem>
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMargin">
+                  <VBox><Text text="{i18n>admEvRejected}" class="sapUiTinyMarginBottom" /><Label text="{i18n>admEvToRequester}" /></VBox>
+                  <Switch state="{cfg>/notify/rejected}" />
+                </HBox>
+              </CustomListItem>
+              <CustomListItem>
+                <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMargin">
+                  <VBox><Text text="{i18n>admEvGenerated}" class="sapUiTinyMarginBottom" /><Label text="{i18n>admEvToRequester}" /></VBox>
+                  <Switch state="{cfg>/notify/generated}" />
+                </HBox>
+              </CustomListItem>
+            </List>
+          </IconTabFilter>
+        </items>
+      </IconTabBar>
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <ToolbarSpacer />
+        <Button text="{i18n>admSave}" type="Emphasized" icon="sap-icon://save" press=".onSave" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

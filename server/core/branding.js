@@ -24,8 +24,9 @@ const DEFAULT = {
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
+// Sempre devolve um objeto NOVO (nunca o DEFAULT): evita que o nome de uma empresa vaze para as outras
 function merge(base, over) {
-  if (!over) return base;
+  if (!over) return { ...base, colors: { ...base.colors } };
   const out = { ...base, ...over, colors: { ...base.colors } };
   Object.entries(over.colors || {}).forEach(([k, v]) => { if (HEX.test(v)) out.colors[k] = v; });
   return out;
@@ -37,6 +38,14 @@ function loadGlobal() {
   catch (e) { console.warn('[branding] arquivo inválido, usando padrão:', e.message); return DEFAULT; }
 }
 
-const forTenant = (tenant) => merge(loadGlobal(), tenant && tenant.branding);
+/** Marca da empresa: global -> tenants.json -> nome definido na tela Configurações. */
+function forTenant(tenant) {
+  const b = merge(loadGlobal(), tenant && tenant.branding);
+  if (tenant) {
+    const name = require('./settings').load(tenant.id).general.productName;
+    if (name) b.productName = name;
+  }
+  return b;
+}
 
 module.exports = { loadGlobal, forTenant };

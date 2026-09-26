@@ -148,7 +148,13 @@ async function finalizeDraft(_t, _c, draftEntry) {
   return { ok: true, entry };
 }
 
+async function usersContact(_t, _c, ids) {
+  return Object.values(USERS).filter((u) => (ids || []).some((k) => String(k) === String(u.internalKey) || k === u.userCode))
+    .map((u) => ({ key: u.internalKey, code: u.userCode, name: u.userName, email: u.email }));
+}
+
 module.exports = {
+  usersContact,
   name: 'mock',
   searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,
   createPurchaseRequest, listMyRequests, getRequest,

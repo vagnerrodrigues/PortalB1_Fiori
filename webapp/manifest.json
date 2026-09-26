@@ -147,6 +147,11 @@
           "name": "relatorios.run",
           "pattern": "relatorios/{id}",
           "target": "relatorios.run"
+        },
+        {
+          "name": "admin.settings",
+          "pattern": "configuracoes",
+          "target": "admin.settings"
         }
       ],
       "targets": {
@@ -219,6 +224,11 @@
           "id": "despesasDetail",
           "name": "modules.despesas.view.Detail",
           "level": 3
+        },
+        "admin.settings": {
+          "id": "adminSettings",
+          "name": "modules.admin.view.Settings",
+          "level": 2
         }
       }
     }

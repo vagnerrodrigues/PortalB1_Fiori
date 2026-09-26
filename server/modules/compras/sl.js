@@ -509,8 +509,23 @@ async function finalizeDraft(tenant, ctx, draftEntry) {
   return { ok: true };
 }
 
+/** Contatos de usuários B1 (para notificações por e-mail). Aceita InternalKey (número) ou UserCode (texto). */
+async function usersContact(tenant, ctx, ids) {
+  const keys = [...new Set((ids || []).filter((x) => x !== null && x !== undefined && x !== ''))];
+  if (!keys.length) return [];
+  const f = keys.map((k) => (typeof k === 'number' || /^\d+$/.test(k)) ? `InternalKey eq ${Number(k)}` : `UserCode eq '${enc(q(k))}'`).join(' or ');
+  try {
+    const r = await sl.request(tenant, ctx.cookie, 'GET', `/Users?$select=InternalKey,UserCode,UserName,eMail&$filter=${f}`);
+    return (r.value || []).map((u) => ({ key: u.InternalKey, code: u.UserCode, name: u.UserName || u.UserCode, email: u.eMail || '' }));
+  } catch (e) {
+    console.error(`[notificacao] leitura de usuários falhou: ${e.message}`);
+    return [];
+  }
+}
+
 module.exports = {
   name: 'service-layer',
+  usersContact,
   searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,
   createPurchaseRequest, listMyRequests, getRequest,
   listPendingApprovals, countPendingApprovals, countMyRequests, decide, finalizeDraft

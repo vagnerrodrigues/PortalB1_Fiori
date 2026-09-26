@@ -27,7 +27,7 @@ const { wrap, requireAjax, requireAuth, errorHandler } = require('./core/http');
 const MOCK = process.env.MOCK === '1';
 
 // ---------- Módulos registrados ----------
-const registry = ['compras', 'despesas', 'parceiros', 'relatorios'].map((id) => require(`./modules/${id}`));
+const registry = ['compras', 'despesas', 'parceiros', 'relatorios', 'admin'].map((id) => require(`./modules/${id}`));
 
 // ---------- Empresas (multi-tenant) ----------
 function loadTenants() {
@@ -64,6 +64,7 @@ app.use((req, res, next) => {
   next();
 });
 app.use('/api', requireAjax);
+app.use((req, res, next) => { req.mock = MOCK; next(); });
 
 // Rate limit de login por IP
 const loginHits = new Map();
@@ -90,7 +91,11 @@ function describe(tenant, user) {
 // ---------- Núcleo ----------
 app.get('/api/health', (req, res) => res.json({ ok: true, mode: MOCK ? 'mock' : 'service-layer', modules: registry.map((m) => m.id) }));
 
-app.get('/api/branding', (req, res) => res.json(branding.loadGlobal()));
+// Marca da tela de login: global ou da empresa escolhida (?tenant=)
+app.get('/api/branding', (req, res) => {
+  const t = req.query.tenant ? tenantById(String(req.query.tenant)) : null;
+  res.json(t ? branding.forTenant(t) : branding.loadGlobal());
+});
 
 app.get('/api/tenants', (req, res) => res.json(tenants.map((t) => ({ id: t.id, name: t.name }))));
 
@@ -124,7 +129,7 @@ app.get('/api/me', authed, (req, res) => res.json(describe(req.tenant, req.sessi
 registry.forEach((mod) => {
   const guard = (req, res, next) => {
     const enabled = access.enabledModules(req.tenant, registry).some((m) => m.id === mod.id);
-    if (!enabled || !access.canAccess(req.tenant, req.session.user, mod.id)) {
+    if (!enabled || !access.canAccess(req.tenant, req.session.user, mod.id, mod)) {
       return res.status(403).json({ error: `Sem acesso ao módulo ${mod.title}` });
     }
     next();

@@ -4,3 +4,7 @@ logs/
 .env
 deploy/windows/nssm.exe
 *.zip
+config/settings/
+config/secret.key
+config/branding.json
+config/reports.json

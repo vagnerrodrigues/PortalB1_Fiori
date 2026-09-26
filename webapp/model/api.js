@@ -25,6 +25,7 @@ sap.ui.define([], function () {
   return {
     get: function (sUrl) { return request("GET", sUrl); },
     post: function (sUrl, oBody) { return request("POST", sUrl, oBody || {}); },
+    put: function (sUrl, oBody) { return request("PUT", sUrl, oBody || {}); },
     onUnauthorized: function (fn) { fnUnauthorized = fn; }
   };
 });

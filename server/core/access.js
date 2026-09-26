@@ -13,12 +13,14 @@
  */
 function enabledModules(tenant, registry) {
   const allowed = Array.isArray(tenant.modules) ? tenant.modules : registry.map((m) => m.id);
-  return registry.filter((m) => allowed.includes(m.id));
+  return registry.filter((m) => m.adminOnly || allowed.includes(m.id)); // Configurações sempre disponível
 }
 
-function canAccess(tenant, user, moduleId) {
+function canAccess(tenant, user, moduleId, mod) {
   if (user.superuser) return true;
   const rule = (tenant.moduleAccess || {})[moduleId];
+  // Módulos administrativos: só superusuário do B1 ou usuários listados explicitamente
+  if (mod && mod.adminOnly) return !!(rule && (rule.users || []).includes(user.userCode));
   if (!rule) return true;
   const deps = rule.departments || [];
   const users = rule.users || [];
@@ -27,7 +29,7 @@ function canAccess(tenant, user, moduleId) {
 }
 
 function modulesForUser(tenant, user, registry) {
-  return enabledModules(tenant, registry).filter((m) => canAccess(tenant, user, m.id));
+  return enabledModules(tenant, registry).filter((m) => canAccess(tenant, user, m.id, m));
 }
 
 module.exports = { enabledModules, canAccess, modulesForUser };

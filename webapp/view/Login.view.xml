@@ -7,7 +7,7 @@
         <Title text="{brand>/productName}" level="H1" titleStyle="H3" class="pbLoginTitle" />
         <Text text="{i18n>loginTitle}" class="sapUiSmallMarginBottom sapUiTinyMarginTop" />
         <Label text="{i18n>company}" labelFor="company" required="true" />
-        <Select id="company" width="100%" items="{login>/tenants}" selectedKey="{login>/tenantId}">
+        <Select id="company" width="100%" items="{login>/tenants}" selectedKey="{login>/tenantId}" change=".onTenantChange">
           <core:Item key="{login>id}" text="{login>name}" />
         </Select>
         <Label text="{i18n>user}" labelFor="user" required="true" class="sapUiSmallMarginTop" />

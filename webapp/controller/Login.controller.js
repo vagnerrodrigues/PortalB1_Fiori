@@ -13,7 +13,17 @@ sap.ui.define(["./BaseController", "sap/ui/model/json/JSONModel"], function (Bas
         oModel.setProperty("/tenants", aTenants);
         if (!oModel.getProperty("/tenantId") && aTenants.length) { oModel.setProperty("/tenantId", aTenants[0].id); }
         oModel.setProperty("/demo", aTenants.length === 1 && aTenants[0].id === "demo");
-      });
+        this.onTenantChange();
+      }.bind(this));
+    },
+
+    // Cada empresa pode ter nome/marca própria: aplica já na tela de login
+    onTenantChange: function () {
+      var sTenant = this.getModel("login").getProperty("/tenantId");
+      if (!sTenant) { return; }
+      this.api.get("/api/branding?tenant=" + encodeURIComponent(sTenant)).then(function (b) {
+        this.getOwnerComponent().setBranding(b);
+      }.bind(this)).catch(function () {});
     },
 
     onLogin: function () {

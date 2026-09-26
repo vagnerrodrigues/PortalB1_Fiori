@@ -13,6 +13,7 @@
  */
 const express = require('express');
 const attachments = require('../../core/attachments');
+const notify = require('../../core/notify');
 const sl = require('../../core/slClient');
 
 const DEFAULT_CATEGORIES = [
@@ -129,6 +130,7 @@ module.exports = {
         attachmentEntry
       });
       audit(req, 'EXPENSE_CREATE', { ...result, attachments: att.files.length });
+      if (result.source === 'draft') notify.approvalRequested(req, b1, result.entry);
       res.status(201).json(result);
     }));
 
@@ -159,6 +161,7 @@ module.exports = {
       if (draft.status !== 'APPROVED') return res.status(400).json({ error: 'Despesa ainda não aprovada' });
       const out = await b1.finalizeDraft(req.tenant, req.session.ctx, Number(req.params.entry));
       audit(req, 'EXPENSE_FINALIZE', { draftEntry: Number(req.params.entry) });
+      notify.generated(req, b1, Number(req.params.entry));
       res.json(out);
     }));
 

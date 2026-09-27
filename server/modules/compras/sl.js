@@ -32,7 +32,14 @@ const q = (s) => String(s || '').replace(/'/g, "''"); // escape OData string
 const enc = encodeURIComponent;
 
 // ---------- Dados mestre ----------
+const catalog = require('./itemCatalog');
+/** Busca de itens: catálogo em memória (rápido); enquanto ele carrega, consulta direta ao SL. */
 async function searchItems(tenant, ctx, term) {
+  return catalog.find(tenant, ctx, term, () => searchItemsLive(tenant, ctx, term));
+}
+const warmup = (tenant, ctx) => { catalog.warm(tenant, ctx); };
+
+async function searchItemsLive(tenant, ctx, term) {
   const t = enc(q(term));
   const filter = `PurchaseItem eq 'tYES' and Valid eq 'tYES'` +
     (term ? ` and (contains(ItemCode,'${t}') or contains(ItemName,'${t}'))` : '');
@@ -294,6 +301,15 @@ async function readDraft(tenant, ctx, entry, withLines) {
   }
 }
 
+/** Executa fn em paralelo com no máximo `n` chamadas simultâneas, preservando a ordem. */
+async function mapLimit(list, n, fn) {
+  const out = new Array(list.length);
+  let next = 0;
+  const worker = async () => { while (next < list.length) { const i = next++; out[i] = await fn(list[i], i); } };
+  await Promise.all(Array.from({ length: Math.min(n, list.length) }, worker));
+  return out;
+}
+
 const userNames = new Map();
 async function userName(tenant, ctx, internalKey) {
   const key = `${tenant.id}:${internalKey}`;
@@ -492,9 +508,11 @@ async function listPendingApprovals(tenant, ctx, user) {
   const mine = await pendingForUser(tenant, ctx, user);
   mine.sort((a, b) => Number(b.Code) - Number(a.Code)); // mais recentes primeiro
   // Enriquecer com cabeçalho do rascunho (nº, total, datas, solicitante)
+  // Cabeçalhos dos rascunhos em paralelo (até 8 por vez) em vez de um por um
+  const heads = await mapLimit(mine.slice(0, 100), 8, (a) => readDraft(tenant, ctx, draftKey(a), false).catch(() => null));
   const out = [];
-  for (const a of mine.slice(0, 100)) {
-    const d = (await readDraft(tenant, ctx, draftKey(a), false)) || {};
+  for (const [idx, a] of mine.slice(0, 100).entries()) {
+    const d = heads[idx] || {};
     out.push({
       kind: kindByObj(a.ObjectType),
       cardName: d.CardName || '',
@@ -567,6 +585,7 @@ async function usersContact(tenant, ctx, ids) {
 
 module.exports = {
   name: 'service-layer',
+  warmup, mapLimit,
   KINDS, kindByObj, createDocument, seriesForBranch, docTotal, mapDocStatus, approvalsForDrafts, mapApprovalStatus, summary, readDraft,
   usersContact,
   searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,

@@ -39,10 +39,11 @@ async function listDocs(tenant, ctx, user, kind, { status = 'open', cardCode } =
     status === 'closed' ? new Map() : base.approvalsForDrafts(tenant, ctx, ` and OriginatorID eq ${Number(user.internalKey)}`, [k.obj])
   ]);
   const out = [];
-  for (const [draftEntry, a] of approvals) {
+  const open = [...approvals].filter(([, a]) => !['GENERATED', 'CANCELLED'].includes(base.mapApprovalStatus(a.Status)));
+  const heads = await base.mapLimit(open, 8, ([draftEntry]) => base.readDraft(tenant, ctx, draftEntry, false).catch(() => null));
+  for (const [idx, [draftEntry, a]] of open.entries()) {
     const st = base.mapApprovalStatus(a.Status);
-    if (st === 'GENERATED' || st === 'CANCELLED') continue;
-    const d = (await base.readDraft(tenant, ctx, draftEntry, false)) || { DocEntry: draftEntry, DocDate: a.CreationDate };
+    const d = heads[idx] || { DocEntry: draftEntry, DocDate: a.CreationDate };
     if (cardCode && d.CardCode && d.CardCode !== cardCode) continue;
     out.push({ ...base.summary('draft', d, st, a), kind });
   }
@@ -50,8 +51,41 @@ async function listDocs(tenant, ctx, user, kind, { status = 'open', cardCode } =
   return out;
 }
 
-/** Linhas em aberto de solicitações de compra (insumo da cotação). */
-async function openRequestLines(tenant, ctx, { branch } = {}) {
+/**
+ * Linhas em aberto de solicitações de compra (insumo da cotação).
+ * Uma única consulta SQL (SQLQueries em OPRQ/PRQ1) em vez de ler até 200 documentos inteiros pelo SL.
+ * Se o SL não liberar essas tabelas para SQLQueries, cai na leitura via OData.
+ */
+const sqlQuery = require('../../core/sqlQuery');
+const OPEN_PR_LINES = {
+  code: 'PB_PR_OPEN_LINES', name: 'Portal B1 - linhas abertas de solicitacoes de compra',
+  sql: 'SELECT T0."DocEntry", T0."DocNum", T0."DocDate", T0."ReqDate", T0."Requester", T0."ReqName", T0."BPLId", ' +
+       'T1."LineNum", T1."ItemCode", T1."Dscription", T1."OpenQty", T1."unitMsr", T1."PQTReqDate", T1."WhsCode", T1."OcrCode", T1."FreeTxt", T1."Price" ' +
+       'FROM "OPRQ" T0 INNER JOIN "PRQ1" T1 ON T0."DocEntry" = T1."DocEntry" ' +
+       'WHERE T0."DocStatus" = \'O\' AND T0."CANCELED" = \'N\' AND T0."DocType" = \'I\' AND T1."LineStatus" = \'O\' AND T1."OpenQty" > 0 ' +
+       'AND (:branch = 0 OR T0."BPLId" = :branch) ORDER BY T0."DocEntry" DESC, T1."LineNum"'
+};
+let sqlOpenLinesOff = false;
+
+async function openRequestLines(tenant, ctx, opts = {}) {
+  if (!sqlOpenLinesOff) {
+    try {
+      const { rows } = await sqlQuery.run(tenant, ctx, OPEN_PR_LINES, { branch: Number(opts.branch) || 0 }, 3000);
+      return rows.map((r) => ({
+        prEntry: r.DocEntry, prDocNum: r.DocNum, prLine: r.LineNum, docDate: d10(r.DocDate), requester: r.ReqName || r.Requester,
+        branch: r.BPLId ?? null, itemCode: r.ItemCode, itemName: r.Dscription, uom: r.unitMsr || '', quantity: Number(r.OpenQty),
+        requiredDate: d10(r.PQTReqDate || r.ReqDate), warehouse: r.WhsCode || '', costCenter: r.OcrCode || '', freeText: r.FreeTxt || '',
+        estimatedPrice: r.Price ?? null
+      }));
+    } catch (e) {
+      sqlOpenLinesOff = true;
+      console.error(`[compras] SQL de linhas abertas indisponível (${e.message}); usando leitura OData`);
+    }
+  }
+  return openRequestLinesOData(tenant, ctx, opts);
+}
+
+async function openRequestLinesOData(tenant, ctx, { branch } = {}) {
   const f = [`DocumentStatus eq 'bost_Open'`, `Cancelled eq 'tNO'`, `DocType eq 'dDocument_Items'`];
   if (branch) f.push(`BPL_IDAssignedToInvoice eq ${Number(branch)}`);
   const docs = await sl.getAll(tenant, ctx.cookie,

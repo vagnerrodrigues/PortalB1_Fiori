@@ -110,6 +110,12 @@ npm test                # testes ponta a ponta (mock)
 - **Windows Server:** `deploy/windows/LEIA-ME.md` (serviço Windows + IIS com HTTPS)
 - **Outros ambientes:** `cp config/tenants.example.json config/tenants.json`, preencher e rodar `npm start` atrás de HTTPS com `COOKIE_SECURE=1`
 
+### Desempenho
+- Conexões com o Service Layer são reaproveitadas (keep-alive) e compactadas (gzip).
+- A busca de itens roda num catálogo em memória (itens de compra ativos), carregado em segundo plano quando o usuário abre a tela inicial e atualizado a cada 15 min (`ITEM_CACHE_MIN`). Item recém-cadastrado no B1 aparece na próxima atualização.
+- As linhas abertas das solicitações (cotação) vêm de uma única consulta SQLQueries (`PB_PR_OPEN_LINES`).
+- Chamadas ao SL acima de 1,5 s (`SL_SLOW_MS`) aparecem em `logs\service.log` como `[sl] lento: … ms`.
+
 ## Adicionar um módulo novo
 
 1. Criar `server/modules/<id>/index.js` exportando `{ id, title, tiles, createRouter }` + adaptadores `sl.js` / `mock.js`

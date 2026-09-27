@@ -25,6 +25,20 @@ function parseSetCookies(headers) {
     .join('; ');
 }
 
+// Conexões reaproveitadas (keep-alive): evita um handshake TLS novo a cada chamada ao Service Layer,
+// que era o maior custo fixo por requisição.
+const zlib = require('zlib');
+const agents = new Map();
+function agentFor(lib, rejectUnauthorized) {
+  const key = `${lib === http ? 'http' : 'https'}:${rejectUnauthorized}`;
+  if (!agents.has(key)) {
+    agents.set(key, new lib.Agent({ keepAlive: true, keepAliveMsecs: 15000, maxSockets: 32, maxFreeSockets: 8, timeout: 60000,
+      ...(lib === http ? {} : { rejectUnauthorized }) }));
+  }
+  return agents.get(key);
+}
+const SLOW_MS = Number(process.env.SL_SLOW_MS || 1500);
+
 function rawRequest(tenant, method, path, { body, cookie, headers = {}, binary = false } = {}) {
   const base = tenant.serviceLayerUrl.replace(/\/$/, '');
   const url = new URL(base + path);
@@ -38,8 +52,10 @@ function rawRequest(tenant, method, path, { body, cookie, headers = {}, binary =
     port: url.port,
     path: url.pathname + url.search,
     rejectUnauthorized: tenant.rejectUnauthorized !== false,
+    agent: agentFor(lib, tenant.rejectUnauthorized !== false),
     headers: {
       Accept: 'application/json',
+      ...(binary ? {} : { 'Accept-Encoding': 'gzip' }),
       ...(payload ? { 'Content-Type': 'application/json', 'Content-Length': isRaw ? payload.length : Buffer.byteLength(payload) } : {}),
       ...(cookie ? { Cookie: cookie } : {}),
       ...headers
@@ -47,12 +63,18 @@ function rawRequest(tenant, method, path, { body, cookie, headers = {}, binary =
     timeout: Number(process.env.SL_TIMEOUT_MS || 30000)
   };
 
+  const started = Date.now();
   return new Promise((resolve, reject) => {
     const req = lib.request(opts, (res) => {
       const chunks = [];
       res.on('data', (chunk) => chunks.push(chunk));
       res.on('end', () => {
-        const buf = Buffer.concat(chunks);
+        const ms = Date.now() - started;
+        if (ms > SLOW_MS) console.log(`[sl] lento: ${ms} ms ${method} ${path.split('?')[0]}`);
+        let buf = Buffer.concat(chunks);
+        if (res.headers['content-encoding'] === 'gzip') {
+          try { buf = zlib.gunzipSync(buf); } catch (e) { return reject(new SLError(502, 'NETWORK', `Resposta compactada inválida: ${e.message}`)); }
+        }
         if (binary && res.statusCode < 400) return resolve({ status: res.statusCode, headers: res.headers, body: buf });
         const data = buf.toString('utf8');
         let json = null;
@@ -94,11 +116,11 @@ async function request(tenant, cookie, method, path, body, headers) {
 }
 
 /** Pagina automaticamente via odata.nextLink até `max` registros. */
-async function getAll(tenant, cookie, path, max = 500) {
+async function getAll(tenant, cookie, path, max = 500, pageSize = 100) {
   let out = [];
   let next = path;
   while (next && out.length < max) {
-    const body = await request(tenant, cookie, 'GET', next, undefined, { Prefer: 'odata.maxpagesize=100' });
+    const body = await request(tenant, cookie, 'GET', next, undefined, { Prefer: `odata.maxpagesize=${pageSize}` });
     out = out.concat(body.value || []);
     const link = body['odata.nextLink'] || body['@odata.nextLink'];
     next = link ? '/' + link.replace(/^\/?(b1s\/v\d\/)?/, '') : null;

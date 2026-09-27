@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev:mock": "MOCK=1 node server/index.js",
-    "test": "node server/test/smoke.test.js && node server/test/procure.test.js && node server/test/sl-shape.test.js && node server/test/sl-procure-shape.test.js"
+    "test": "node server/test/smoke.test.js && node server/test/procure.test.js && node server/test/sl-shape.test.js && node server/test/sl-procure-shape.test.js && node server/test/perf.test.js"
   },
   "engines": {
     "node": ">=18"

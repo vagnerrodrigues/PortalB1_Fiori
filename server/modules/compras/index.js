@@ -136,6 +136,7 @@ module.exports = {
     const counterCache = new Map();
     const clearCounters = (req) => { for (const k of counterCache.keys()) if (k.startsWith(`${req.tenant.id}:`)) counterCache.delete(k); };
     r.get('/counters', wrap(async (req, res) => {
+      if (b1.warmup) b1.warmup(req.tenant, req.session.ctx); // tela inicial já aquece o catálogo de itens
       const key = `${req.tenant.id}:${req.session.user.userCode}`;
       const hit = counterCache.get(key);
       if (hit && Date.now() - hit.at < 30000) return res.json(hit.value);

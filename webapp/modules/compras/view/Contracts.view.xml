@@ -12,12 +12,24 @@
     </subHeader>
     <Table id="list" items="{list>/}" noDataText="{i18n>noData}" growing="true" growingThreshold="30">
       <columns>
-        <Column><Text text="{i18n>contractDesc}" /></Column>
-        <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>supplier}" /></Column>
-        <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>contractValidity}" /></Column>
-        <Column hAlign="End" minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>contractPlannedAmount}" /></Column>
-        <Column width="12rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>contractConsumption}" /></Column>
-        <Column width="8rem"><Text text="{i18n>rfqStatus}" /></Column>
+        <Column sortIndicator="{= ${view>/sort} === 'agreementNo' ? ${view>/dir} : 'None' }">
+          <Button text="{i18n>contractDesc}" type="Transparent" press=".onSort('agreementNo')" class="pbSortHdr" />
+        </Column>
+        <Column minScreenWidth="Tablet" demandPopin="true" sortIndicator="{= ${view>/sort} === 'cardName' ? ${view>/dir} : 'None' }">
+          <Button text="{i18n>supplier}" type="Transparent" press=".onSort('cardName')" class="pbSortHdr" />
+        </Column>
+        <Column minScreenWidth="Tablet" demandPopin="true" sortIndicator="{= ${view>/sort} === 'endDate' ? ${view>/dir} : 'None' }">
+          <Button text="{i18n>contractValidity}" type="Transparent" press=".onSort('endDate')" class="pbSortHdr" />
+        </Column>
+        <Column hAlign="End" minScreenWidth="Desktop" demandPopin="true" sortIndicator="{= ${view>/sort} === 'plannedAmount' ? ${view>/dir} : 'None' }">
+          <Button text="{i18n>contractPlannedAmount}" type="Transparent" press=".onSort('plannedAmount')" class="pbSortHdr" />
+        </Column>
+        <Column width="12rem" minScreenWidth="Tablet" demandPopin="true" sortIndicator="{= ${view>/sort} === 'consumption' ? ${view>/dir} : 'None' }">
+          <Button text="{i18n>contractConsumption}" type="Transparent" press=".onSort('consumption')" class="pbSortHdr" />
+        </Column>
+        <Column width="8rem" sortIndicator="{= ${view>/sort} === 'status' ? ${view>/dir} : 'None' }">
+          <Button text="{i18n>rfqStatus}" type="Transparent" press=".onSort('status')" class="pbSortHdr" />
+        </Column>
       </columns>
       <items>
         <ColumnListItem type="Navigation" press=".onOpen">

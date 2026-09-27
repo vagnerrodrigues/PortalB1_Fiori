@@ -89,3 +89,6 @@
 .pbHBar span { display: block; height: 100%; background: var(--pbAccent, #035DD0); border-radius: 3px; }
 .pbKpiValue .sapMObjectNumberText, .pbDashValue .sapMObjectNumberText { line-height: 1.3; }
 .pbKpiValue.sapMObjectNumber, .pbDashValue.sapMObjectNumber { overflow: visible; }
+.pbSortHdr.sapMBtn .sapMBtnInner { padding: 0 !important; border: 0 !important; background: transparent !important; }
+.pbSortHdr.sapMBtn .sapMBtnText { font-weight: 700; color: var(--sapList_HeaderTextColor, #32363a) !important; }
+.pbSortHdr.sapMBtn:hover .sapMBtnText { color: var(--pbAccent, #035DD0) !important; text-decoration: underline; }

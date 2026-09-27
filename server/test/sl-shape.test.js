@@ -12,7 +12,9 @@ const rec = {
 let current = rec;
 sl.getAll = async () => [current];
 let sqlRows = null; // null = SL recusa OWDD/WDD1 em SQLQueries (usa OData)
+let draftReads = 0;
 sl.request = async (t, c, m, p) => {
+  if (p.startsWith('/Drafts(')) draftReads++;
   if (p.startsWith('/SQLQueries')) {
     if (!sqlRows) { const e = new sl.SLError(400, -1, "Table 'OWDD' not accessible"); throw e; }
     return p.endsWith('/List') ? { value: sqlRows } : {};
@@ -44,10 +46,15 @@ const b1 = require('../modules/compras/sl');
   const aq = require('../modules/compras/approvalsSql');
   aq._off.clear();
   sqlRows = [
-    { WddCode: 90001, ObjType: '22', IsDraft: 'Y', DraftEntry: 81000, DocEntry: 81000, Status: 'W', CurrStep: 663, OwnerID: 1, CreateDate: '2026-09-27', Remarks: '', StepCode: 663, UserID: 82, LineStatus: 'W' },
+    { WddCode: 90001, ObjType: '22', IsDraft: 'Y', DraftEntry: 81000, DocEntry: 81000, Status: 'W', CurrStep: 663, OwnerID: 1, CreateDate: '2026-09-27', Remarks: '', StepCode: 663, UserID: 82, LineStatus: 'W',
+      DrfNum: 44, DrfType: 'I', DrfDate: '2026-09-27', DrfTotal: 12600, DrfCardCode: 'F3', DrfCardName: 'TechStore', DrfReqName: 'Diego' },
     { WddCode: 90001, ObjType: '22', IsDraft: 'Y', DraftEntry: 81000, DocEntry: 81000, Status: 'W', CurrStep: 663, OwnerID: 1, CreateDate: '2026-09-27', Remarks: '', StepCode: 663, UserID: 90, LineStatus: 'Y' }
   ];
+  draftReads = 0;
   const viaSql = await b1.listPendingApprovals({ id: 'sql' }, {}, { internalKey: 82 });
+  assert.strictEqual(draftReads, 0, 'cabeçalho do rascunho deve vir na própria consulta SQL');
+  assert.strictEqual(viaSql[0].cardName, 'TechStore');
+  assert.strictEqual(viaSql[0].total, 12600);
   assert.strictEqual(viaSql.length, 1);
   assert.strictEqual(viaSql[0].kind, 'po');
   assert.strictEqual(viaSql[0].draftEntry, 81000);

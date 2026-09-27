@@ -1,5 +1,6 @@
 'use strict';
 /** Desempenho: catálogo de itens em memória e linhas abertas por SQL (sem SAP). */
+process.env.ITEM_CACHE = '1';
 const assert = require('assert');
 const sl = require('../core/slClient');
 

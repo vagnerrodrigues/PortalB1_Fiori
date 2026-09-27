@@ -33,11 +33,18 @@ const enc = encodeURIComponent;
 
 // ---------- Dados mestre ----------
 const catalog = require('./itemCatalog');
-/** Busca de itens: catálogo em memória (rápido); enquanto ele carrega, consulta direta ao SL. */
+/**
+ * Busca de itens. Padrão: consulta direta (1 chamada leve por busca).
+ * ITEM_CACHE=1 liga o catálogo em memória. Atenção: o Service Layer atende as chamadas de uma sessão em fila,
+ * então carregar o catálogo com a sessão do usuário trava as outras telas dele enquanto carrega
+ * (medido no B1 real: chamadas simples passaram de 20 s). Só ligue em bases com SL folgado.
+ */
+const CATALOG_ON = process.env.ITEM_CACHE === '1';
 async function searchItems(tenant, ctx, term) {
+  if (!CATALOG_ON) return searchItemsLive(tenant, ctx, term);
   return catalog.find(tenant, ctx, term, () => searchItemsLive(tenant, ctx, term));
 }
-const warmup = (tenant, ctx) => { catalog.warm(tenant, ctx); };
+const warmup = (tenant, ctx) => { if (CATALOG_ON) catalog.warm(tenant, ctx); };
 
 async function searchItemsLive(tenant, ctx, term) {
   const t = enc(q(term));
@@ -527,7 +534,8 @@ async function listPendingApprovals(tenant, ctx, user) {
   mine.sort((a, b) => Number(b.Code) - Number(a.Code)); // mais recentes primeiro
   // Enriquecer com cabeçalho do rascunho (nº, total, datas, solicitante)
   // Cabeçalhos dos rascunhos em paralelo (até 8 por vez) em vez de um por um
-  const heads = await mapLimit(mine.slice(0, 100), 8, (a) => readDraft(tenant, ctx, draftKey(a), false).catch(() => null));
+  // Via SQL o cabeçalho do rascunho já vem junto (_draft); só lê pelo SL o que faltar
+  const heads = await mapLimit(mine.slice(0, 100), 2, (a) => (a._draft ? a._draft : readDraft(tenant, ctx, draftKey(a), false).catch(() => null)));
   const out = [];
   for (const [idx, a] of mine.slice(0, 100).entries()) {
     const d = heads[idx] || {};

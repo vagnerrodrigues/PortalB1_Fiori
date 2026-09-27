@@ -145,7 +145,7 @@ module.exports = {
         b1.countMyRequests(req.tenant, req.session.ctx, req.session.user),
         b1.countPendingApprovals(req.tenant, req.session.ctx, req.session.user),
         buyer ? Promise.resolve(rfq.list(req).filter((x) => x.status === 'OPEN' || x.status === 'EXPIRED' || x.pendingSync).length) : Promise.resolve(undefined),
-        buyer ? b1.listDocs(req.tenant, req.session.ctx, req.session.user, 'po', { status: 'open' }).then((a) => a.length) : Promise.resolve(undefined)
+        buyer ? b1.countOpen(req.tenant, req.session.ctx, 'po') : Promise.resolve(undefined)
       ]);
       [mine, approvals, rfqs, orders].forEach((x) => { if (x.status === 'rejected') console.error('[compras] contador falhou:', x.reason && x.reason.message); });
       const out = {};

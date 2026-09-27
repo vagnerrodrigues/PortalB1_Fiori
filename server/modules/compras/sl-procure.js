@@ -26,6 +26,12 @@ async function vendorContact(tenant, ctx, cardCode) {
 // ---------- Listas ----------
 const LIST_SEL = '$select=DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,DocCurrency,DocumentStatus,Cancelled,Comments,NumAtCard,BPL_IDAssignedToInvoice';
 
+/** Contagem leve (tile): pedidos/ofertas em aberto, sem ler documentos. */
+async function countOpen(tenant, ctx, kind) {
+  return Number(await sl.request(tenant, ctx.cookie, 'GET',
+    `/${KINDS[kind].coll}/$count?$filter=DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'`)) || 0;
+}
+
 /** Documentos (pq/po) + rascunhos meus aguardando aprovação. */
 async function listDocs(tenant, ctx, user, kind, { status = 'open', cardCode } = {}) {
   const k = KINDS[kind];
@@ -40,7 +46,7 @@ async function listDocs(tenant, ctx, user, kind, { status = 'open', cardCode } =
   ]);
   const out = [];
   const open = [...approvals].filter(([, a]) => !['GENERATED', 'CANCELLED'].includes(base.mapApprovalStatus(a.Status)));
-  const heads = await base.mapLimit(open, 8, ([draftEntry]) => base.readDraft(tenant, ctx, draftEntry, false).catch(() => null));
+  const heads = await base.mapLimit(open, 2, ([draftEntry, a]) => (a._draft ? a._draft : base.readDraft(tenant, ctx, draftEntry, false).catch(() => null)));
   for (const [idx, [draftEntry, a]] of open.entries()) {
     const st = base.mapApprovalStatus(a.Status);
     const d = heads[idx] || { DocEntry: draftEntry, DocDate: a.CreationDate };
@@ -264,7 +270,7 @@ async function setAgreementStatus(tenant, ctx, no, status) {
 }
 
 module.exports = {
-  vendorContact, listDocs, openRequestLines,
+  vendorContact, listDocs, countOpen, openRequestLines,
   createQuotation, writeQuotationAnswer, closeDoc, cancelDoc,
   createPurchaseOrder,
   listAgreements, getAgreement, createAgreement, setAgreementStatus

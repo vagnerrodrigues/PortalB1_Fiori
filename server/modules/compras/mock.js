@@ -334,6 +334,7 @@ module.exports = {
   createPurchaseRequest, listMyRequests, getRequest,
   listPendingApprovals, countPendingApprovals: async (t, c, u) => (await listPendingApprovals(t, c, u)).length,
   countMyRequests: async (t, c, u) => (await listMyRequests(t, c, u)).filter((x) => ['PENDING', 'APPROVED', 'OPEN'].includes(x.status)).length, decide, finalizeDraft,
+  countOpen: async (_t, _c, kind) => db[kind].filter((d) => d.status === 'OPEN').length,
   vendorContact, listDocs, openRequestLines, createQuotation, writeQuotationAnswer, closeDoc, cancelDoc, createPurchaseOrder,
   listAgreements, getAgreement, createAgreement, setAgreementStatus,
   _db: db

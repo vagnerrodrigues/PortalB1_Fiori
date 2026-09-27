@@ -1,0 +1,85 @@
+'use strict';
+/**
+ * Leitura rápida dos pedidos de aprovação (OWDD/WDD1) via SQLQueries.
+ * O objeto ApprovalRequests do Service Layer é caro (medido no B1 10.0: ~9,6 s numa única chamada),
+ * porque monta cada pedido com todas as linhas. A consulta SQL filtra direto por usuário/originador/rascunho.
+ * Devolve os registros no MESMO formato do SL (Code, Status 'arsPending', ApprovalRequestLines...), então
+ * o resto do código não muda. Se o SL não liberar OWDD/WDD1 para SQLQueries, devolve null e o chamador
+ * usa o OData.
+ */
+const sqlQuery = require('../../core/sqlQuery');
+
+// SQLQueries do SL aceita um SQL restrito: sem subconsulta; filtros com AND/OR simples
+const OBJ_FILTER = '(T0."ObjType" = \'1470000113\' OR T0."ObjType" = \'540000006\' OR T0."ObjType" = \'22\')';
+const COLS = 'T0."WddCode", T0."ObjType", T0."IsDraft", T0."DraftEntry", T0."DocEntry", T0."Status", T0."CurrStep", T0."OwnerID", ' +
+  'T0."CreateDate", T0."Remarks", T1."StepCode", T1."UserID", T1."Status" AS "LineStatus", T1."Remarks" AS "LineRemarks", T1."UpdateDate"';
+const FROM = 'FROM "OWDD" T0 INNER JOIN "WDD1" T1 ON T0."WddCode" = T1."WddCode" ';
+
+const Q = {
+  // Pendentes na etapa atual para o aprovador
+  pending: {
+    code: 'PB_APPR_PENDING', name: 'Portal B1 - aprovacoes pendentes do usuario',
+    sql: `SELECT ${COLS} ${FROM}INNER JOIN "WDD1" T2 ON T0."WddCode" = T2."WddCode" ` +
+      `WHERE T0."Status" = 'W' AND ${OBJ_FILTER} AND T2."UserID" = :user AND T2."Status" = 'W' AND T2."StepCode" = T0."CurrStep" ` +
+      'ORDER BY T0."WddCode" DESC'
+  },
+  // Pedidos de aprovação criados pelo usuário (minhas solicitações/pedidos)
+  owner: {
+    code: 'PB_APPR_OWNER', name: 'Portal B1 - aprovacoes do originador',
+    sql: `SELECT ${COLS} ${FROM}WHERE T0."OwnerID" = :owner AND ${OBJ_FILTER} ORDER BY T0."WddCode" DESC`
+  },
+  // Um rascunho (tela de detalhe / histórico)
+  draft: {
+    code: 'PB_APPR_DRAFT', name: 'Portal B1 - aprovacao de um rascunho',
+    sql: `SELECT ${COLS} ${FROM}WHERE T0."DraftEntry" = :draft AND ${OBJ_FILTER} ORDER BY T0."WddCode" DESC`
+  }
+};
+
+const HDR = { W: 'arsPending', Y: 'arsApproved', N: 'arsNotApproved', P: 'arsGenerated', A: 'arsGeneratedByAuthorizer', C: 'arsCancelled' };
+const LIN = { W: 'ardPending', Y: 'ardApproved', N: 'ardNotApproved' };
+const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
+
+/** Agrupa linhas SQL (1 por aprovador) no formato do objeto ApprovalRequests do SL. */
+function toSL(rows) {
+  const map = new Map();
+  rows.forEach((r) => {
+    let a = map.get(r.WddCode);
+    if (!a) {
+      const isDraft = r.IsDraft === 'Y';
+      a = {
+        Code: Number(r.WddCode), ObjectType: String(r.ObjType), IsDraft: r.IsDraft,
+        DraftEntry: num(r.DraftEntry) ?? (isDraft ? num(r.DocEntry) : null),
+        ObjectEntry: isDraft ? null : num(r.DocEntry),
+        Status: HDR[r.Status] || 'arsPending', CurrentStage: num(r.CurrStep), OriginatorID: num(r.OwnerID),
+        CreationDate: r.CreateDate, Remarks: r.Remarks || '', ApprovalRequestLines: []
+      };
+      map.set(r.WddCode, a);
+    }
+    a.ApprovalRequestLines.push({
+      StageCode: num(r.StepCode), UserID: num(r.UserID), Status: LIN[r.LineStatus] || 'ardPending',
+      Remarks: r.LineRemarks || '', UpdateDate: r.UpdateDate || null
+    });
+  });
+  return [...map.values()];
+}
+
+const off = new Set(); // empresas onde o SL recusou OWDD/WDD1 em SQLQueries
+async function run(tenant, ctx, q, params) {
+  if (off.has(tenant.id)) return null;
+  try {
+    return toSL((await sqlQuery.run(tenant, ctx, q, params, 5000)).rows);
+  } catch (e) {
+    if (e.status === 401) throw e; // sessão expirada: não é falta de permissão na tabela
+    off.add(tenant.id);
+    console.error(`[compras] SQL de aprovações indisponível (${e.message}); usando ApprovalRequests (mais lento). ` +
+      'Para acelerar, libere OWDD e WDD1 no b1s_sqltable.conf do Service Layer.');
+    return null;
+  }
+}
+
+module.exports = {
+  pendingFor: (tenant, ctx, userKey) => run(tenant, ctx, Q.pending, { user: Number(userKey) }),
+  byOwner: (tenant, ctx, ownerKey) => run(tenant, ctx, Q.owner, { owner: Number(ownerKey) }),
+  byDraft: (tenant, ctx, draftEntry) => run(tenant, ctx, Q.draft, { draft: Number(draftEntry) }),
+  toSL, _off: off
+};

@@ -324,9 +324,20 @@ async function userName(tenant, ctx, internalKey) {
   return name;
 }
 
-async function approvalsForDrafts(tenant, ctx, filterExtra, objs = [OBJ_PURCHASE_REQUEST]) {
-  const extra = String(filterExtra || '').replace(/^\s*and\s+/i, '');
-  const rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests${extra ? `?$filter=${extra}` : ''}`, 1000);
+const approvalsSql = require('./approvalsSql');
+
+/**
+ * Pedidos de aprovação indexados pelo rascunho. spec = { owner } ou { draft } usa SQL (rápido);
+ * sem SQL liberado, cai no OData com filterExtra.
+ */
+async function approvalsForDrafts(tenant, ctx, filterExtra, objs = [OBJ_PURCHASE_REQUEST], spec = null) {
+  let rows = null;
+  if (spec && spec.owner !== undefined) rows = await approvalsSql.byOwner(tenant, ctx, spec.owner);
+  else if (spec && spec.draft !== undefined) rows = await approvalsSql.byDraft(tenant, ctx, spec.draft);
+  if (!rows) {
+    const extra = String(filterExtra || '').replace(/^\s*and\s+/i, '');
+    rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests${extra ? `?$filter=${extra}` : ''}`, 1000);
+  }
   const byDraft = new Map();
   // Depois de gerado o documento, o OWDD passa a IsDraft "N" e ObjectEntry = documento criado;
   // DraftEntry continua apontando o rascunho de origem -> não filtrar por IsDraft.
@@ -341,7 +352,7 @@ async function listMyRequests(tenant, ctx, user, kind) {
   const [docs, drafts, approvals] = await Promise.all([
     sl.getAll(tenant, ctx.cookie, `/PurchaseRequests?${sel}&$filter=Requester eq '${u}'&$orderby=DocEntry desc`, 100),
     sl.getAll(tenant, ctx.cookie, `/Drafts?${sel}&$filter=DocObjectCode eq 'oPurchaseRequest' and Requester eq '${u}'&$orderby=DocEntry desc`, 100),
-    approvalsForDrafts(tenant, ctx, ` and OriginatorID eq ${Number(user.internalKey)}`)
+    approvalsForDrafts(tenant, ctx, ` and OriginatorID eq ${Number(user.internalKey)}`, undefined, { owner: user.internalKey })
   ]);
   const out = [];
   drafts.forEach((d) => {
@@ -379,7 +390,7 @@ function summary(source, d, status, approval) {
 async function getRequest(tenant, ctx, source, entry, kind = 'pr') {
   let approval = null;
   if (source === 'draft') {
-    const map = await approvalsForDrafts(tenant, ctx, ` and DraftEntry eq ${Number(entry)}`, ALL_OBJ);
+    const map = await approvalsForDrafts(tenant, ctx, ` and DraftEntry eq ${Number(entry)}`, ALL_OBJ, { draft: entry });
     approval = map.get(Number(entry)) || null;
   }
   let d = source === 'draft'
@@ -468,8 +479,9 @@ function mapApproval(a) {
 const APPROVAL_SEL = '$select=Code,ObjectType,IsDraft,Status,CurrentStage,DraftEntry,ObjectEntry,OriginatorID,CreationDate,Remarks,ApprovalRequestLines';
 
 async function pendingForUser(tenant, ctx, user) {
-  let rows;
-  try {
+  // SQL já traz só os pedidos em que o usuário é aprovador da etapa atual (o OData traz os de todos)
+  let rows = await approvalsSql.pendingFor(tenant, ctx, user.internalKey);
+  if (!rows) try {
     rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?${APPROVAL_SEL}&$filter=Status eq 'arsPending'`, 2000);
   } catch (_) { // versão do SL que não aceita $select nesses campos
     rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?$filter=Status eq 'arsPending'`, 2000);
@@ -487,10 +499,16 @@ async function pendingForUser(tenant, ctx, user) {
 async function countMyRequests(tenant, ctx, user) {
   const u = enc(q(user.userCode));
   const count = async (path) => Number(await sl.request(tenant, ctx.cookie, 'GET', path)) || 0;
-  const open = await count(`/PurchaseRequests/$count?$filter=Requester eq '${u}' and DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'`);
   const flow = `OriginatorID eq ${Number(user.internalKey)} and (Status eq 'arsPending' or Status eq 'arsApproved')`;
   let inApproval;
-  try {
+  // as duas contagens em paralelo
+  const [open, viaSql] = await Promise.all([
+    count(`/PurchaseRequests/$count?$filter=Requester eq '${u}' and DocumentStatus eq 'bost_Open' and Cancelled eq 'tNO'`),
+    approvalsSql.byOwner(tenant, ctx, user.internalKey)
+  ]);
+  if (viaSql) {
+    inApproval = viaSql.filter((a) => String(a.ObjectType) === OBJ_PURCHASE_REQUEST && ['arsPending', 'arsApproved'].includes(a.Status)).length;
+  } else try {
     inApproval = await count(`/ApprovalRequests/$count?$filter=${flow} and ObjectType eq '${OBJ_PURCHASE_REQUEST}'`);
   } catch (_) {
     const rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?$select=Code,ObjectType&$filter=${flow}`, 2000);

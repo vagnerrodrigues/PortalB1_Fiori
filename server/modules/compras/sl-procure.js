@@ -36,7 +36,7 @@ async function listDocs(tenant, ctx, user, kind, { status = 'open', cardCode } =
   const filter = f.length ? `&$filter=${f.join(' and ')}` : '';
   const [docs, approvals] = await Promise.all([
     sl.getAll(tenant, ctx.cookie, `/${k.coll}?${LIST_SEL}${filter}&$orderby=DocEntry desc`, 200),
-    status === 'closed' ? new Map() : base.approvalsForDrafts(tenant, ctx, ` and OriginatorID eq ${Number(user.internalKey)}`, [k.obj])
+    status === 'closed' ? new Map() : base.approvalsForDrafts(tenant, ctx, ` and OriginatorID eq ${Number(user.internalKey)}`, [k.obj], { owner: user.internalKey })
   ]);
   const out = [];
   const open = [...approvals].filter(([, a]) => !['GENERATED', 'CANCELLED'].includes(base.mapApprovalStatus(a.Status)));

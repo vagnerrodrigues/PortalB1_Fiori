@@ -11,7 +11,12 @@ const rec = {
 };
 let current = rec;
 sl.getAll = async () => [current];
+let sqlRows = null; // null = SL recusa OWDD/WDD1 em SQLQueries (usa OData)
 sl.request = async (t, c, m, p) => {
+  if (p.startsWith('/SQLQueries')) {
+    if (!sqlRows) { const e = new sl.SLError(400, -1, "Table 'OWDD' not accessible"); throw e; }
+    return p.endsWith('/List') ? { value: sqlRows } : {};
+  }
   if (p.startsWith('/PurchaseRequests(')) return { DocEntry: 555, DocNum: 9001 };
   if (p.startsWith('/Drafts(')) return { DocEntry: 80651, DocNum: 10712, DocTotal: 50, Requester: 'manager', RequesterName: 'manager', DocumentLines: [] };
   return { value: [] };
@@ -34,4 +39,20 @@ const b1 = require('../modules/compras/sl');
   assert.strictEqual(gen.status, 'GENERATED');
   assert.deepStrictEqual(gen.generated, { entry: 555, docNum: 9001 });
   console.log('  ✔ rascunho gerado aponta para a solicitação criada');
+
+  // Caminho rápido: OWDD/WDD1 via SQLQueries (2 aprovadores na mesma etapa) no formato do SL
+  const aq = require('../modules/compras/approvalsSql');
+  aq._off.clear();
+  sqlRows = [
+    { WddCode: 90001, ObjType: '22', IsDraft: 'Y', DraftEntry: 81000, DocEntry: 81000, Status: 'W', CurrStep: 663, OwnerID: 1, CreateDate: '2026-09-27', Remarks: '', StepCode: 663, UserID: 82, LineStatus: 'W' },
+    { WddCode: 90001, ObjType: '22', IsDraft: 'Y', DraftEntry: 81000, DocEntry: 81000, Status: 'W', CurrStep: 663, OwnerID: 1, CreateDate: '2026-09-27', Remarks: '', StepCode: 663, UserID: 90, LineStatus: 'Y' }
+  ];
+  const viaSql = await b1.listPendingApprovals({ id: 'sql' }, {}, { internalKey: 82 });
+  assert.strictEqual(viaSql.length, 1);
+  assert.strictEqual(viaSql[0].kind, 'po');
+  assert.strictEqual(viaSql[0].draftEntry, 81000);
+  const shaped = aq.toSL(sqlRows)[0];
+  assert.strictEqual(shaped.Status, 'arsPending');
+  assert.deepStrictEqual(shaped.ApprovalRequestLines.map((l) => l.Status), ['ardPending', 'ardApproved']);
+  console.log('  ✔ aprovações via SQL (OWDD/WDD1) no mesmo formato do Service Layer');
 })().catch((e) => { console.error('FALHOU:', e); process.exit(1); });

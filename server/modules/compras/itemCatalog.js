@@ -35,9 +35,9 @@ function warm(tenant, ctx) {
     c.loading = load(tenant, ctx)
       .then((items) => {
         c.items = items; c.loadedAt = Date.now();
-        console.log(`[compras] catálogo de itens: ${items.length} itens em ${Date.now() - t0} ms`);
+        console.log(`[compras] catalogo de itens: ${items.length} itens em ${Date.now() - t0} ms`);
       })
-      .catch((e) => console.error(`[compras] catálogo de itens não carregou (${e.message}); busca direto no SAP`))
+      .catch((e) => console.error(`[compras] catalogo de itens nao carregou (${e.message}); busca direto no SAP`))
       .finally(() => { c.loading = null; });
   }
   return c;

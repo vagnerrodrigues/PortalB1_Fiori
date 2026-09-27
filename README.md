@@ -114,6 +114,7 @@ npm test                # testes ponta a ponta (mock)
 - Conexões com o Service Layer são reaproveitadas (keep-alive) e compactadas (gzip).
 - A busca de itens roda num catálogo em memória (itens de compra ativos), carregado em segundo plano quando o usuário abre a tela inicial e atualizado a cada 15 min (`ITEM_CACHE_MIN`). Item recém-cadastrado no B1 aparece na próxima atualização.
 - As linhas abertas das solicitações (cotação) vêm de uma única consulta SQLQueries (`PB_PR_OPEN_LINES`).
+- Aprovações (contador, lista de pendentes, histórico) leem OWDD/WDD1 via SQLQueries (`PB_APPR_*`), filtrando pelo aprovador. O objeto `ApprovalRequests` do SL levou 9,6 s numa chamada no B1 10.0 testado. Se o SL recusar essas tabelas, o log mostra `SQL de aprovações indisponível` e o portal volta ao OData: libere `OWDD` e `WDD1` no `b1s_sqltable.conf`.
 - Chamadas ao SL acima de 1,5 s (`SL_SLOW_MS`) aparecem em `logs\service.log` como `[sl] lento: … ms`.
 
 ## Adicionar um módulo novo

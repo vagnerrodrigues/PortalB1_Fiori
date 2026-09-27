@@ -46,7 +46,8 @@ async function listDocs(tenant, ctx, user, kind, { status = 'open', cardCode } =
   ]);
   const out = [];
   const open = [...approvals].filter(([, a]) => !['GENERATED', 'CANCELLED'].includes(base.mapApprovalStatus(a.Status)));
-  const heads = await base.mapLimit(open, 2, ([draftEntry, a]) => (a._draft ? a._draft : base.readDraft(tenant, ctx, draftEntry, false).catch(() => null)));
+  const headMap = await base.readDraftHeaders(tenant, ctx, open.filter(([, a]) => !a._draft).map(([e]) => e));
+  const heads = open.map(([e, a]) => a._draft || headMap.get(Number(e)) || null);
   for (const [idx, [draftEntry, a]] of open.entries()) {
     const st = base.mapApprovalStatus(a.Status);
     const d = heads[idx] || { DocEntry: draftEntry, DocDate: a.CreationDate };

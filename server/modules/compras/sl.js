@@ -317,6 +317,32 @@ async function mapLimit(list, n, fn) {
   return out;
 }
 
+/**
+ * Cabeçalhos de vários rascunhos numa única chamada (/Drafts com filtro por DocEntry, 20 por vez),
+ * em vez de um GET por rascunho — cada GET entra na fila da sessão do SL.
+ */
+async function readDraftHeaders(tenant, ctx, entries) {
+  const out = new Map();
+  const list = [...new Set(entries.map(Number).filter(Boolean))];
+  for (let i = 0; i < list.length; i += 20) {
+    const chunk = list.slice(i, i + 20);
+    try {
+      const rows = await sl.getAll(tenant, ctx.cookie,
+        `/Drafts?$select=DocEntry,DocNum,DocType,DocObjectCode,DocDate,DocDueDate,RequriedDate,DocCurrency,Requester,RequesterName,CardCode,CardName,Comments,DocumentLines` +
+        `&$filter=${chunk.map((e) => `DocEntry eq ${e}`).join(' or ')}`, 100);
+      rows.forEach((d) => out.set(Number(d.DocEntry), d));
+    } catch (e) {
+      if (e.status === 401) throw e;
+      // aprovador sem permissão de ler rascunho alheio: tenta um a um (usa o fallback SQL do readDraft)
+      for (const entry of chunk) {
+        const d = await readDraft(tenant, ctx, entry, false).catch(() => null);
+        if (d) out.set(entry, d);
+      }
+    }
+  }
+  return out;
+}
+
 const userNames = new Map();
 async function userName(tenant, ctx, internalKey) {
   const key = `${tenant.id}:${internalKey}`;
@@ -485,9 +511,36 @@ function mapApproval(a) {
 // ---------- Aprovação ----------
 const APPROVAL_SEL = '$select=Code,ObjectType,IsDraft,Status,CurrentStage,DraftEntry,ObjectEntry,OriginatorID,CreationDate,Remarks,ApprovalRequestLines';
 
+// Pendências por usuário: o contador da tela inicial e a lista de aprovações usam a mesma leitura (20 s de cache)
+const pendingCache = new Map();
+const PENDING_TTL = 20000;
+const clearPending = (tenant) => { for (const k of pendingCache.keys()) if (k.startsWith(`${tenant.id}:`)) pendingCache.delete(k); };
+const noAnyFilter = new Set(); // empresas cujo SL não aceita any() em ApprovalRequestLines
+
 async function pendingForUser(tenant, ctx, user) {
+  const key = `${tenant.id}:${user.internalKey}`;
+  const hit = pendingCache.get(key);
+  if (hit && Date.now() - hit.at < PENDING_TTL) return hit.value;
+  const p = pendingForUserLoad(tenant, ctx, user);
+  pendingCache.set(key, { at: Date.now(), value: p });
+  p.catch(() => pendingCache.delete(key));
+  return p;
+}
+
+async function pendingForUserLoad(tenant, ctx, user) {
   // SQL já traz só os pedidos em que o usuário é aprovador da etapa atual (o OData traz os de todos)
   let rows = await approvalsSql.pendingFor(tenant, ctx, user.internalKey);
+  // OData: tenta filtrar no SL só os pedidos em que o usuário tem decisão pendente
+  if (!rows && !noAnyFilter.has(tenant.id)) {
+    try {
+      rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?${APPROVAL_SEL}&$filter=Status eq 'arsPending' and ` +
+        `ApprovalRequestLines/any(l: l/UserID eq ${Number(user.internalKey)} and l/Status eq 'ardPending')`, 2000);
+    } catch (e) {
+      if (e.status === 401) throw e;
+      noAnyFilter.add(tenant.id);
+      rows = null;
+    }
+  }
   if (!rows) try {
     rows = await sl.getAll(tenant, ctx.cookie, `/ApprovalRequests?${APPROVAL_SEL}&$filter=Status eq 'arsPending'`, 2000);
   } catch (_) { // versão do SL que não aceita $select nesses campos
@@ -535,7 +588,8 @@ async function listPendingApprovals(tenant, ctx, user) {
   // Enriquecer com cabeçalho do rascunho (nº, total, datas, solicitante)
   // Cabeçalhos dos rascunhos em paralelo (até 8 por vez) em vez de um por um
   // Via SQL o cabeçalho do rascunho já vem junto (_draft); só lê pelo SL o que faltar
-  const heads = await mapLimit(mine.slice(0, 100), 2, (a) => (a._draft ? a._draft : readDraft(tenant, ctx, draftKey(a), false).catch(() => null)));
+  const headMap = await readDraftHeaders(tenant, ctx, mine.slice(0, 100).filter((a) => !a._draft).map(draftKey));
+  const heads = mine.slice(0, 100).map((a) => a._draft || headMap.get(draftKey(a)) || null);
   const out = [];
   for (const [idx, a] of mine.slice(0, 100).entries()) {
     const d = heads[idx] || {};
@@ -558,6 +612,7 @@ async function listPendingApprovals(tenant, ctx, user) {
 }
 
 async function decide(tenant, ctx, approvalCode, approve, remarks) {
+  clearPending(tenant);
   await sl.request(tenant, ctx.cookie, 'PATCH', `/ApprovalRequests(${Number(approvalCode)})`, {
     ApprovalRequestDecisions: [{ Status: approve ? 'ardApproved' : 'ardNotApproved', Remarks: remarks || '' }]
   });
@@ -611,7 +666,7 @@ async function usersContact(tenant, ctx, ids) {
 
 module.exports = {
   name: 'service-layer',
-  warmup, mapLimit,
+  warmup, mapLimit, readDraftHeaders, clearPending,
   KINDS, kindByObj, createDocument, seriesForBranch, docTotal, mapDocStatus, approvalsForDrafts, mapApprovalStatus, summary, readDraft,
   usersContact,
   searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,

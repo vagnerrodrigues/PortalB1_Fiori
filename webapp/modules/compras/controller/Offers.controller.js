@@ -26,7 +26,9 @@ sap.ui.define([
         new Filter("cardName", FilterOperator.Contains, s),
         new Filter("cardCode", FilterOperator.Contains, s),
         new Filter("comments", FilterOperator.Contains, s),
-        new Filter({ path: "docNum", test: function (v) { return String(v).indexOf(s) >= 0; } })
+        new Filter({ path: "docNum", test: function (v) { return String(v).indexOf(s) >= 0; } }),
+        // rascunho aparece como "rascunho <entry>": a busca também acha pelo nº do rascunho/esboço
+        new Filter({ path: "entry", test: function (v) { return String(v).indexOf(s) >= 0; } })
       ], and: false })] : [];
       this.byId("list").getBinding("items").filter(aFilters);
     },

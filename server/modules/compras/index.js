@@ -86,7 +86,7 @@ module.exports = {
   tiles: [
     { id: 'new', title: 'Nova solicitação', subtitle: 'Solicitar materiais e serviços', icon: 'sap-icon://cart-4', route: 'compras.new' },
     { id: 'mine', title: 'Solicitações de compra', subtitle: 'Minhas solicitações', icon: 'sap-icon://my-sales-order', route: 'compras.mine', counter: true },
-    { id: 'rfq', title: 'Cotações online', subtitle: 'Fornecedores respondem pela web', icon: 'sap-icon://compare', route: 'compras.rfqs', counter: true, buyer: true },
+    { id: 'rfq', title: 'Cotações online', subtitle: 'Em andamento (sem pedido gerado)', icon: 'sap-icon://compare', route: 'compras.rfqs', counter: true, buyer: true },
     { id: 'offers', title: 'Ofertas de compra', subtitle: 'Propostas dos fornecedores', icon: 'sap-icon://sales-quote', route: 'compras.offers', buyer: true },
     { id: 'orders', title: 'Pedidos de compra', subtitle: 'Emitir e acompanhar', icon: 'sap-icon://sales-order', route: 'compras.orders', counter: true, buyer: true },
     { id: 'contracts', title: 'Contratos guarda-chuva', subtitle: 'Acordos com fornecedores', icon: 'sap-icon://umbrella', route: 'compras.contracts', buyer: true },
@@ -146,7 +146,8 @@ module.exports = {
       const [mine, approvals, rfqs, orders] = await Promise.allSettled([
         b1.countMyRequests(req.tenant, req.session.ctx, req.session.user),
         b1.countPendingApprovals(req.tenant, req.session.ctx, req.session.user),
-        buyer ? Promise.resolve(rfq.list(req).filter((x) => x.status === 'OPEN' || x.status === 'EXPIRED' || x.pendingSync).length) : Promise.resolve(undefined),
+        // Em andamento = ainda sem pedido: recebendo respostas, prazo vencido ou encerrada aguardando decisão
+        buyer ? Promise.resolve(rfq.list(req).filter((x) => ['OPEN', 'EXPIRED', 'CLOSED'].includes(x.status) || x.pendingSync).length) : Promise.resolve(undefined),
         buyer ? b1.countOpen(req.tenant, req.session.ctx, 'po') : Promise.resolve(undefined)
       ]);
       [mine, approvals, rfqs, orders].forEach((x) => { if (x.status === 'rejected') console.error('[compras] contador falhou:', x.reason && x.reason.message); });

@@ -396,8 +396,12 @@ async function listMyRequests(tenant, ctx, user, kind) {
   });
   docs.forEach((d) => out.push(summary('doc', d, mapDocStatus(d))));
   const want = kind === 'service' ? 'service' : kind === 'items' ? 'items' : null;
-  return out.filter((x) => !want || x.docType === want).sort((a, b) => String(b.docDate).localeCompare(String(a.docDate)));
+  return out.filter((x) => !want || x.docType === want).sort(byRecent);
 }
+
+/** Mais recente primeiro: data do documento; no mesmo dia, rascunho (em andamento) antes, depois maior nº. */
+const byRecent = (a, b) => String(b.docDate || '').slice(0, 10).localeCompare(String(a.docDate || '').slice(0, 10)) ||
+  (a.source === b.source ? 0 : a.source === 'draft' ? -1 : 1) || (Number(b.entry) - Number(a.entry));
 
 const kindOf = (d) => (d.DocType === 'dDocument_Service' ? 'service' : 'items');
 
@@ -672,7 +676,7 @@ async function usersContact(tenant, ctx, ids) {
 
 module.exports = {
   name: 'service-layer',
-  warmup, mapLimit, entryByDocNum, readDraftHeaders, clearPending,
+  warmup, mapLimit, entryByDocNum, byRecent, readDraftHeaders, clearPending,
   KINDS, kindByObj, createDocument, seriesForBranch, docTotal, mapDocStatus, approvalsForDrafts, mapApprovalStatus, summary, readDraft,
   usersContact,
   searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,

@@ -144,7 +144,7 @@ async function listMyRequests(_t, _c, user, kind) {
   const drafts = db.drafts.filter((d) => d.kind === 'pr' && d.requester === user.userCode)
     .map((d) => sum('draft', d, approvalOf(d.entry).status)).filter((d) => d.status !== 'GENERATED');
   const docs = db.pr.filter((d) => d.requester === user.userCode).map((d) => sum('doc', d, d.status));
-  return [...drafts, ...docs].filter((x) => !kind || x.docType === kind).sort((a, b) => b.entry - a.entry);
+  return [...drafts, ...docs].filter((x) => !kind || x.docType === kind).sort(require('./sl').byRecent);
 }
 
 async function getRequest(_t, _c, source, entry, kind = 'pr') {
@@ -209,7 +209,7 @@ async function listDocs(_t, _c, user, kind, { status = 'open', cardCode } = {}) 
     .map((d) => sum('draft', d, approvalOf(d.entry).status));
   const docs = db[kind].filter((d) => status === 'all' || (status === 'open' ? d.status === 'OPEN' : d.status === 'CLOSED'))
     .map((d) => sum('doc', d, d.status));
-  return [...drafts, ...docs].filter((d) => !cardCode || d.cardCode === cardCode).sort((a, b) => b.entry - a.entry);
+  return [...drafts, ...docs].filter((d) => !cardCode || d.cardCode === cardCode).sort(require('./sl').byRecent);
 }
 
 async function openRequestLines() {

@@ -67,7 +67,7 @@ async function listDocs(tenant, ctx, user, kind, { status = 'open', cardCode } =
     out.push({ ...base.summary('draft', d, st, a), kind });
   }
   docs.forEach((d) => out.push({ ...base.summary('doc', d, base.mapDocStatus(d)), kind, numAtCard: d.NumAtCard || '' }));
-  return out;
+  return out.sort(base.byRecent);
 }
 
 /**

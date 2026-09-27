@@ -14,8 +14,9 @@ const notify = require('../../core/notify');
 const access = require('../../core/access');
 const { createService, buildMap } = require('./rfq');
 const dashboard = require('./dashboard');
+const relations = require('./relations');
 
-const adapter = (mock) => (mock ? require('./mock') : { ...require('./sl'), ...require('./sl-procure') });
+const adapter = (mock) => (mock ? require('./mock') : { ...require('./sl'), ...require('./sl-procure'), ...require('./sl-relations') });
 const KIND_OK = ['pr', 'pq', 'po'];
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -255,6 +256,13 @@ module.exports = {
       const doc = await b1.getRequest(req.tenant, req.session.ctx, p.source, p.entry, p.kind);
       doc.attachments = await attachments.list(req.tenant, req.session.ctx, doc.attachmentEntry, mock);
       res.json(doc);
+    }));
+
+    // Mapa de relações (solicitação → cotação → oferta → pedido → recebimento → nota)
+    r.get('/docs/:kind/:source/:entry/relations', wrap(async (req, res) => {
+      const p = docParams(req, res);
+      if (!p) return;
+      res.json(await relations.build({ tenant: req.tenant, ctx: req.session.ctx, b1, kind: p.kind, source: p.source, entry: p.entry }));
     }));
 
     r.get('/docs/:kind/:source/:entry/attachments/:line', wrap(async (req, res) => {

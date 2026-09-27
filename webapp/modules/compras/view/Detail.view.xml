@@ -57,6 +57,20 @@
 
       <core:Fragment fragmentName="portal.b1.view.fragments.AttachmentsList" type="XML" />
 
+      <Panel expandable="true" expanded="true" class="sapUiResponsiveContentPadding sapUiMediumMarginTop pbRelPanel"
+        visible="{= ${doc>/docType} !== 'service' &amp;&amp; !!${doc>/entry} }">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{i18n>relTitle}" level="H3" />
+            <Text text="{parts: [{value: 'relCount'}, 'rel>/count'], formatter: '.formatter.txt'}" class="sapUiSmallMarginBegin" />
+            <ToolbarSpacer />
+            <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onLoadRelations" type="Transparent" />
+          </OverflowToolbar>
+        </headerToolbar>
+        <Text text="{i18n>relHint}" class="sapUiSmallMarginBottom" />
+        <VBox id="relBox" />
+      </Panel>
+
       <Table items="{doc>/approval/steps}" headerText="{i18n>approvalHistory}" visible="{= !!${doc>/approval}}"
         class="sapUiResponsiveContentPadding sapUiMediumMarginTop">
         <columns>

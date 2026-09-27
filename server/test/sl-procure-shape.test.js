@@ -66,4 +66,16 @@ const proc = require('../modules/compras/sl-procure');
   assert.strictEqual(agBody.Status, 'asApproved');
   assert.deepStrictEqual(agBody.BlanketAgreements_ItemsLines[0], { ItemNo: 'A1', PlannedQuantity: 100, UnitPrice: 3.5 });
   console.log('  ✔ contrato guarda-chuva (BlanketAgreements) por item');
+
+  const { linksOf } = require('../modules/compras/sl-relations');
+  const lk = linksOf([
+    { BaseType: 540000006, BaseEntry: 11, TargetType: 20, TargetAbsEntry: 90, AgreementNo: 7 },
+    { BaseType: -1, BaseEntry: null, TargetType: -1, TargetAbsEntry: null },
+    { BaseType: 540000006, BaseEntry: 11, TargetType: 18, TargetAbsEntry: 95 }
+  ]);
+  assert.deepStrictEqual(lk.links, [
+    { dir: 'up', kind: 'pq', entry: 11 }, { dir: 'down', kind: 'gr', entry: 90 }, { dir: 'down', kind: 'ap', entry: 95 }
+  ]);
+  assert.deepStrictEqual(lk.agreements, [7]);
+  console.log('  ✔ vínculos do mapa de relações (BaseType/BaseEntry, TargetType/TargetAbsEntry, AgreementNo)');
 })().catch((e) => { console.error('FALHOU:', e); process.exit(1); });

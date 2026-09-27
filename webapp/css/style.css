@@ -92,3 +92,25 @@
 .pbSortHdr.sapMBtn .sapMBtnInner { padding: 0 !important; border: 0 !important; background: transparent !important; }
 .pbSortHdr.sapMBtn .sapMBtnText { font-weight: 700; color: var(--sapList_HeaderTextColor, #32363a) !important; }
 .pbSortHdr.sapMBtn:hover .sapMBtnText { color: var(--pbAccent, #035DD0) !important; text-decoration: underline; }
+
+/* ---------- Mapa de relações ---------- */
+.pbRelWrap { overflow-x: auto; padding-bottom: 0.5rem; }
+.pbRelCanvas { position: relative; }
+.pbRelSvg { position: absolute; left: 0; top: 0; overflow: visible; }
+.pbRelSvg path { fill: none; stroke: #8a94a6; stroke-width: 1.6; stroke-dasharray: 5 4; }
+.pbRelSvg marker path { fill: #8a94a6; stroke: none; }
+.pbRelSvg text { font-size: 11px; fill: #5d6677; }
+.pbRelCard { position: absolute; box-sizing: border-box; background: #fff; border: 1px solid #dfe3ea; border-left: 5px solid var(--pbRelColor, #035DD0);
+  border-radius: 0.625rem; padding: 0.5rem 0.75rem; box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08); overflow: hidden; font-size: 0.8125rem; }
+.pbRelNav { cursor: pointer; }
+.pbRelNav:hover, .pbRelNav:focus { box-shadow: 0 6px 16px rgba(7, 0, 112, 0.18); outline: none; }
+.pbRelCurrent { box-shadow: 0 0 0 2px var(--pbRelColor, #035DD0), 0 6px 16px rgba(7, 0, 112, 0.16); }
+.pbRelKind { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--pbRelColor, #035DD0); font-weight: 700; display: flex; justify-content: space-between; }
+.pbRelKind b { background: #fff3cd; color: #8a5a00; border-radius: 999px; padding: 0 0.5rem; font-size: 0.625rem; }
+.pbRelNum { font-size: 1rem; font-weight: 700; color: #1d2433; margin-top: 0.125rem; display: flex; justify-content: space-between; gap: 0.5rem; }
+.pbRelNum span { font-size: 0.8125rem; font-weight: 600; color: #3a4252; white-space: nowrap; }
+.pbRelSub { color: #5d6677; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pbRelEmpty { color: #5d6677; font-style: italic; padding: 0.5rem 0; }
+.pbRel-pr { --pbRelColor: #6c4bd6; } .pbRel-rfq { --pbRelColor: #0a8f8a; } .pbRel-pq { --pbRelColor: #0b74de; }
+.pbRel-ag { --pbRelColor: #b36b00; } .pbRel-po { --pbRelColor: #070070; } .pbRel-gr { --pbRelColor: #2e7d32; }
+.pbRel-ap { --pbRelColor: #c2185b; } .pbRel-rt, .pbRel-cm { --pbRelColor: #bb0000; }

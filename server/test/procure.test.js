@@ -164,6 +164,18 @@ async function main() {
     assert.strictEqual(closedPub.open, false);
     ok('vencedores viram pedidos de compra copiados da oferta; cotação encerrada para fornecedores');
 
+    // ---------- mapa de relações ----------
+    const rel = (await call('GET', `/api/m/compras/docs/po/doc/${po1.entry}/relations`, null, buy)).json;
+    const kinds = rel.nodes.map((n) => n.kind).sort();
+    assert.ok(['pr', 'rfq', 'pq', 'po'].every((k) => kinds.includes(k)), JSON.stringify(kinds));
+    assert.ok(rel.nodes.find((n) => n.kind === 'po' && n.entry === po1.entry).current);
+    const rk = `rfq:${rfq.id}`;
+    assert.ok(rel.edges.some((e) => e.from === `pr:${pr.json.entry}` && e.to === rk));
+    assert.ok(rel.edges.some((e) => e.from === rk && e.to === `pq:${s1.pq.entry}`));
+    assert.ok(rel.edges.some((e) => e.from === `pq:${s1.pq.entry}` && e.to === `po:${po1.entry}`));
+    assert.strictEqual(rel.nodes.filter((n) => n.kind === 'pq').length, 3); // as 3 ofertas da cotação
+    ok('mapa de relações: solicitação → cotação → ofertas → pedido');
+
     // ---------- contrato guarda-chuva + pedido consumindo ----------
     const agBad = await call('POST', '/api/m/compras/agreements', { cardCode: 'F0003', startDate: day(10), endDate: day(1), description: '', method: 'item', lines: [] }, buy);
     assert.strictEqual(agBad.status, 400);
@@ -184,6 +196,9 @@ async function main() {
     assert.strictEqual(agAfter.lines[0].usedQty, 3);
     assert.strictEqual(agAfter.lines[0].openQty, 47);
     ok('contrato guarda-chuva criado e consumido pelo pedido (saldo atualizado)');
+    const relAg = (await call('GET', `/api/m/compras/docs/po/doc/${po.json.entry}/relations`, null, buy)).json;
+    assert.ok(relAg.edges.some((e) => e.from === `ag:${ag.json.agreementNo}` && e.to === `po:${po.json.entry}`));
+    ok('mapa de relações mostra o contrato consumido pelo pedido');
 
     // ---------- pedido acima do limite: aprovação ----------
     const bigPo = await call('POST', '/api/m/compras/orders', {

@@ -354,6 +354,33 @@ async function setAgreementStatus(_t, _c, no, status) {
   a.status = status;
 }
 
+// Mapa de relações: base (para trás) e cópias (para frente) a partir das linhas
+async function docLinks(_t, _c, kind, entry) {
+  const d = (db[kind] || []).find((x) => x.entry === Number(entry));
+  if (!d) throw new SLError(404, -2028, 'Documento não encontrado');
+  const links = new Map();
+  d.lines.forEach((l) => { if (l.baseEntry) links.set(`up:${l.baseType}:${l.baseEntry}`, { dir: 'up', kind: l.baseType, entry: Number(l.baseEntry) }); });
+  ['pq', 'po'].forEach((k) => db[k].forEach((x) => x.lines.forEach((l) => {
+    if (l.baseType === kind && Number(l.baseEntry) === d.entry) links.set(`down:${k}:${x.entry}`, { dir: 'down', kind: k, entry: x.entry });
+  })));
+  return {
+    node: { kind, source: 'doc', entry: d.entry, docNum: d.docNum, date: d.docDate, total: d.total, status: d.status, cardCode: d.cardCode, cardName: d.cardName || d.requesterName },
+    links: [...links.values()],
+    agreements: [...new Set(d.lines.map((l) => l.agreementNo).filter(Boolean).map(Number))]
+  };
+}
+async function draftLinks(_t, _c, entry) {
+  const d = db.drafts.find((x) => x.entry === Number(entry));
+  if (!d) throw new SLError(404, -2028, 'Rascunho não encontrado');
+  const a = approvalOf(d.entry);
+  const links = d.lines.filter((l) => l.baseEntry).map((l) => ({ dir: 'up', kind: l.baseType, entry: Number(l.baseEntry) }));
+  if (a && a.generatedEntry) links.push({ dir: 'down', kind: d.kind, entry: a.generatedEntry, generated: true });
+  return {
+    node: { kind: d.kind, source: 'draft', entry: d.entry, docNum: d.entry, date: d.docDate, total: d.total, status: a ? a.status : 'DRAFT', cardCode: d.cardCode, cardName: d.cardName || d.requesterName },
+    links, agreements: []
+  };
+}
+
 seedHistory(); // demonstração já abre com pedidos no painel e na lista
 
 module.exports = {
@@ -366,6 +393,7 @@ module.exports = {
   entryByDocNum: async (_t, _c, kind, docNum) => ((db[kind] || []).find((d) => d.docNum === Number(docNum)) || {}).entry || null,
   ordersForYear: async (_t, _c, year) => { seedHistory(); return db.po.filter((d) => String(d.docDate).startsWith(String(year)))
     .map((d) => ({ entry: d.entry, docNum: d.docNum, date: d.docDate, dueDate: d.dueDate, total: d.total, status: d.status, cardCode: d.cardCode, cardName: d.cardName })); },
+  docLinks, draftLinks,
   countOpen: async (_t, _c, kind) => db[kind].filter((d) => d.status === 'OPEN').length,
   vendorContact, listDocs, openRequestLines, createQuotation, writeQuotationAnswer, closeDoc, cancelDoc, createPurchaseOrder,
   listAgreements, getAgreement, createAgreement, setAgreementStatus,

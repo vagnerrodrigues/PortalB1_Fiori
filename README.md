@@ -52,6 +52,8 @@ Relatórios padrão: contas a receber em aberto, contas a pagar em aberto, venda
 
 As propostas recebem selos (*Menor preço*, *Mais rápida*, *Recomendada*) e uma nota de 0 a 100. *Aplicar recomendação* escolhe o recomendado em todos os itens. A barra mostra o total, o prazo médio e o nº de fornecedores de cada critério.
 
+**Mapa de relações** (no detalhe de solicitação, oferta e pedido): mostra, em cards ligados por setas, a cadeia solicitação → cotação online → ofertas → pedido → recebimento → nota fiscal/devolução, mais o contrato guarda-chuva consumido. Clique no card para abrir o documento. Usa só vínculos nativos das linhas (`BaseType/BaseEntry` para trás, `TargetType/TargetAbsEntry` para frente, `AgreementNo`) e a cotação do portal. Limite de 25 documentos por mapa.
+
 **Painel de compras** (tela inicial, para compradores), por ano:
 - compras no ano, com barras por mês;
 - pedidos em aberto e atrasados (entrega vencida);

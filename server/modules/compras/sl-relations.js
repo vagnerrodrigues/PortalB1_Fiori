@@ -24,8 +24,8 @@ const noAny = new Set(); // empresas cujo SL não aceita any() em DocumentLines
  * Busca TODOS os documentos copiados deste (a linha só guarda o último destino em TargetType):
  * filtro nas linhas do destino por BaseType/BaseEntry. Se o SL não aceitar any(), fica só o TargetType.
  */
-async function copiesOf(tenant, ctx, kind, entry) {
-  if (noAny.has(tenant.id)) return [];
+async function copiesOf(tenant, ctx, kind, entry, head = {}) {
+  if (noAny.has(tenant.id)) return copiesByScan(tenant, ctx, kind, entry, head);
   const out = [];
   for (const t of TARGETS[kind] || []) {
     try {
@@ -35,8 +35,34 @@ async function copiesOf(tenant, ctx, kind, entry) {
     } catch (e) {
       if (e.status === 401) throw e;
       noAny.add(tenant.id);
-      console.error(`[compras] mapa de relações: SL não aceita filtro nas linhas (${e.message}); usando só o último destino de cada linha`);
-      return out;
+      console.error(`[compras] mapa de relações: SL não aceita filtro nas linhas (${e.message}); usando varredura por fornecedor e data`);
+      return copiesByScan(tenant, ctx, kind, entry, head);
+    }
+  }
+  return out;
+}
+
+/**
+ * Plano B (SL sem any()): lê os documentos de destino do mesmo fornecedor a partir da data do documento
+ * e confere as linhas (BaseType/BaseEntry). Limitado a 100 por tipo de destino.
+ */
+async function copiesByScan(tenant, ctx, kind, entry, head) {
+  const out = [];
+  if (!head.date) return out;
+  for (const t of TARGETS[kind] || []) {
+    const f = [`DocDate ge '${head.date}'`];
+    if (head.cardCode && kind !== 'pr') f.push(`CardCode eq '${String(head.cardCode).replace(/'/g, "''")}'`);
+    try {
+      const rows = await sl.getAll(tenant, ctx.cookie,
+        `/${COLL[t]}?$select=DocEntry,DocumentLines&$filter=${encodeURIComponent(f.join(' and '))}&$orderby=DocEntry desc`, 100, 50);
+      rows.forEach((r) => {
+        if ((r.DocumentLines || []).some((l) => Number(l.BaseType) === OBJ_OF[kind] && Number(l.BaseEntry) === Number(entry))) {
+          out.push({ dir: 'down', kind: t, entry: Number(r.DocEntry) });
+        }
+      });
+    } catch (e) {
+      if (e.status === 401) throw e;
+      console.error(`[compras] mapa de relações: varredura de ${COLL[t]} falhou (${e.message})`);
     }
   }
   return out;
@@ -49,7 +75,7 @@ function linksOf(lines) {
     const up = BY_OBJ[Number(l.BaseType)];
     if (up && Number(l.BaseEntry) > 0) links.set(`up:${up}:${l.BaseEntry}`, { dir: 'up', kind: up, entry: Number(l.BaseEntry) });
     const down = BY_OBJ[Number(l.TargetType)];
-    const te = l.TargetAbsEntry ?? l.TargetEntry;
+    const te = Number(l.TargetAbsEntry) || Number(l.TargetEntry) || 0; // o nome muda entre versões do SL
     if (down && Number(te) > 0) links.set(`down:${down}:${te}`, { dir: 'down', kind: down, entry: Number(te) });
     if (Number(l.AgreementNo) > 0) agreements.add(Number(l.AgreementNo));
   });
@@ -60,9 +86,15 @@ async function docLinks(tenant, ctx, kind, entry) {
   const d = await sl.request(tenant, ctx.cookie, 'GET', `/${COLL[kind]}(${Number(entry)})`);
   const own = linksOf(d.DocumentLines);
   const seen = new Set(own.links.map((l) => `${l.dir}:${l.kind}:${l.entry}`));
-  (await copiesOf(tenant, ctx, kind, entry)).forEach((l) => {
+  (await copiesOf(tenant, ctx, kind, entry, { cardCode: d.CardCode, date: d10(d.DocDate) })).forEach((l) => {
     if (!seen.has(`${l.dir}:${l.kind}:${l.entry}`)) own.links.push(l);
   });
+  // Diagnóstico: documento atendido sem nenhum destino encontrado
+  if (base.mapDocStatus(d) === 'CLOSED' && (TARGETS[kind] || []).length && !own.links.some((l) => l.dir === 'down')) {
+    const l0 = (d.DocumentLines || [])[0] || {};
+    console.error(`[compras] mapa de relações: ${COLL[kind]}(${entry}) atendido sem destino. Campos de destino na linha: ` +
+      JSON.stringify(Object.fromEntries(Object.entries(l0).filter(([k2]) => /target|trget/i.test(k2)))));
+  }
   return {
     node: {
       kind, source: 'doc', entry: d.DocEntry, docNum: d.DocNum, date: d10(d.DocDate), total: base.docTotal(d),

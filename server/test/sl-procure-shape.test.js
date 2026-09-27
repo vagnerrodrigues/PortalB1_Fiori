@@ -89,5 +89,20 @@ const proc = require('../modules/compras/sl-procure');
     { dir: 'up', kind: 'pq', entry: 11 }, { dir: 'down', kind: 'gr', entry: 90 }, { dir: 'down', kind: 'ap', entry: 95 }
   ]);
   assert.deepStrictEqual(lk.agreements, [7]);
+  // versões do SL em que o destino vem em TargetEntry (TargetAbsEntry = 0)
+  assert.deepStrictEqual(linksOf([{ BaseType: -1, TargetType: 20, TargetAbsEntry: 0, TargetEntry: 91 }]).links, [{ dir: 'down', kind: 'gr', entry: 91 }]);
+
+  // SL sem any(): varre recebimentos do fornecedor a partir da data do pedido
+  const rel = require('../modules/compras/sl-relations');
+  const origGetAll = sl.getAll;
+  sl.getAll = async (t, c, p) => {
+    if (p.includes('/any(')) throw new sl.SLError(400, -1, 'Invalid filter');
+    if (p.startsWith('/PurchaseDeliveryNotes')) return [{ DocEntry: 2, DocumentLines: [{ BaseType: 22, BaseEntry: 13317 }] }, { DocEntry: 3, DocumentLines: [{ BaseType: 22, BaseEntry: 999 }] }];
+    return [];
+  };
+  const found = await rel.copiesOf({ id: 'scan' }, {}, 'po', 13317, { cardCode: 'F09670', date: '2026-09-27' });
+  assert.deepStrictEqual(found, [{ dir: 'down', kind: 'gr', entry: 2 }]);
+  sl.getAll = origGetAll;
+  console.log('  ✔ mapa de relações sem any(): encontra o recebimento pela varredura do fornecedor');
   console.log('  ✔ vínculos do mapa de relações (BaseType/BaseEntry, TargetType/TargetAbsEntry, AgreementNo)');
 })().catch((e) => { console.error('FALHOU:', e); process.exit(1); });

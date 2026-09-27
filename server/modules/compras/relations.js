@@ -80,7 +80,8 @@ async function build({ tenant, ctx, b1, kind, source, entry }) {
   // Só arestas entre nós conhecidos
   const list = [...edges.values()].filter((e) => nodes.has(e.from) && nodes.has(e.to));
   return {
-    nodes: [...nodes.values()].map((n) => ({ ...n, stage: STAGE[n.kind] ?? 3 })),
+    // rascunho fica numa coluna própria antes do documento que ele gerou
+    nodes: [...nodes.values()].map((n) => ({ ...n, stage: (STAGE[n.kind] ?? 3) - (n.source === 'draft' ? 0.5 : 0) })),
     edges: list,
     truncated: queue.length > 0
   };

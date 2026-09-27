@@ -1,0 +1,74 @@
+<mvc:View controllerName="portal.b1.modules.ia.controller.Connect"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" >
+  <Page title="{i18n>iaTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <VBox class="sapUiMediumMargin">
+        <Text text="{i18n>iaIntro}" class="sapUiSmallMarginBottom" />
+        <MessageStrip text="{i18n>iaDisabled}" type="Warning" showIcon="true" visible="{= !${ia>/enabled} }" class="sapUiSmallMarginBottom">
+          <link><Link text="{i18n>iaOpenSettings}" press=".onOpenSettings" visible="{ia>/superuser}" /></link>
+        </MessageStrip>
+
+        <Title text="{i18n>iaStep1}" level="H3" class="sapUiSmallMarginTop sapUiTinyMarginBottom" />
+        <HBox alignItems="Center">
+          <Input value="{ia>/url}" editable="false" width="32rem" />
+          <Button icon="sap-icon://copy" text="{i18n>iaCopy}" press=".onCopyUrl" class="sapUiTinyMarginBegin" />
+        </HBox>
+
+        <Title text="{i18n>iaStep2}" level="H3" class="sapUiMediumMarginTop sapUiTinyMarginBottom" />
+        <Table items="{ia>/tokens}" noDataText="{i18n>iaNoTokens}">
+          <headerToolbar>
+            <OverflowToolbar>
+              <ToolbarSpacer />
+              <Button text="{i18n>iaNewToken}" icon="sap-icon://key" type="Emphasized" press=".onNewToken" enabled="{ia>/enabled}" />
+            </OverflowToolbar>
+          </headerToolbar>
+          <columns>
+            <Column><Text text="{i18n>iaLabel}" /></Column>
+            <Column><Text text="{i18n>iaScope}" /></Column>
+            <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>iaCreated}" /></Column>
+            <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>iaExpires}" /></Column>
+            <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>iaLastUse}" /></Column>
+            <Column hAlign="End" width="8rem" />
+          </columns>
+          <items>
+            <ColumnListItem>
+              <Text text="{= ${ia>label} || ${ia>id} }" />
+              <ObjectStatus text="{= ${ia>scope} === 'write' ? ${i18n>iaScopeWrite} : ${i18n>iaScopeRead} }"
+                state="{= ${ia>scope} === 'write' ? 'Warning' : 'Information' }" />
+              <Text text="{path: 'ia>createdAt', formatter: '.formatter.date'}" />
+              <ObjectStatus text="{path: 'ia>expiresAt', formatter: '.formatter.date'}" state="{= ${ia>expired} ? 'Error' : 'None' }" />
+              <Text text="{parts: ['ia>lastUsedAt', 'i18n>iaNever'], formatter: '.formatter.dateOr'}" />
+              <Button text="{i18n>iaRevoke}" type="Reject" press=".onRevoke" />
+            </ColumnListItem>
+          </items>
+        </Table>
+
+        <Title text="{i18n>iaStep3}" level="H3" class="sapUiMediumMarginTop sapUiTinyMarginBottom" />
+        <IconTabBar expandable="false" headerMode="Inline" class="sapUiNoContentPadding">
+          <items>
+            <IconTabFilter key="code" text="{i18n>iaClaudeCode}">
+              <VBox>
+                <TextArea value="{ia>/snippetCode}" editable="false" width="100%" growing="true" class="pbCode" />
+                <Button icon="sap-icon://copy" text="{i18n>iaCopy}" press=".onCopySnippet('snippetCode')" />
+              </VBox>
+            </IconTabFilter>
+            <IconTabFilter key="desktop" text="{i18n>iaClaudeDesktop}">
+              <VBox>
+                <TextArea value="{ia>/snippetDesktop}" editable="false" width="100%" growing="true" class="pbCode" />
+                <Button icon="sap-icon://copy" text="{i18n>iaCopy}" press=".onCopySnippet('snippetDesktop')" />
+              </VBox>
+            </IconTabFilter>
+            <IconTabFilter key="others" text="{i18n>iaOthers}">
+              <Text text="{i18n>iaOthersText}" />
+            </IconTabFilter>
+          </items>
+        </IconTabBar>
+
+        <Panel headerText="{i18n>iaExamples}" expandable="true" expanded="true" class="sapUiSmallMarginTop">
+          <Text text="{i18n>iaExamplesText}" />
+        </Panel>
+        <MessageStrip text="{i18n>iaSecurity}" type="Information" showIcon="true" class="sapUiSmallMarginTop" />
+      </VBox>
+    </content>
+  </Page>
+</mvc:View>

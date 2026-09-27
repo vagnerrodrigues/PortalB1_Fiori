@@ -15,6 +15,10 @@
               <Input value="{cfg>/general/portalUrl}" placeholder="https://portal.suaempresa.com.br" type="Url" />
               <Label text="" />
               <Text text="{i18n>admPortalUrlHint}" />
+              <Label text="{i18n>admAiEnabled}" />
+              <Switch state="{cfg>/general/aiEnabled}" customTextOn="Sim" customTextOff="Não" />
+              <Label text="" />
+              <Text text="{i18n>admAiHint}" />
             </f:SimpleForm>
           </IconTabFilter>
 

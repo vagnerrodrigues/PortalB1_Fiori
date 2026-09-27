@@ -89,6 +89,11 @@ sap.ui.define([
       return oBundle.hasText(sKey) ? oBundle.getText(sKey) : oBundle.getText("status_" + sStatus);
     },
     /** Texto i18n com parâmetros: parts [{value: 'chave'}, 'modelo>campo', ...]. Vazio se o 1º parâmetro for vazio. */
+    dateOr: function (s, sFallback) {
+      if (!s) { return sFallback || ""; }
+      var d = oDateIn.parse(String(s).slice(0, 10));
+      return d ? oDateOut.format(d) : s;
+    },
     txt: function (sKey) {
       var aArgs = Array.prototype.slice.call(arguments, 1);
       if (!oBundle || aArgs[0] === undefined || aArgs[0] === null || aArgs[0] === "" || aArgs[0] === 0) { return ""; }

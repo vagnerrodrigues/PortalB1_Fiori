@@ -13,7 +13,7 @@
  */
 function enabledModules(tenant, registry) {
   const allowed = Array.isArray(tenant.modules) ? tenant.modules : registry.map((m) => m.id);
-  return registry.filter((m) => m.adminOnly || allowed.includes(m.id)); // Configurações sempre disponível
+  return registry.filter((m) => (m.adminOnly || allowed.includes(m.id)) && (!m.enabledWhen || m.enabledWhen(tenant))); // Configurações sempre disponível
 }
 
 function canAccess(tenant, user, moduleId, mod) {

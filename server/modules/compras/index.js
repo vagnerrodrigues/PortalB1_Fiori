@@ -79,6 +79,7 @@ function validateAgreement(p) {
 
 module.exports = {
   id: 'compras',
+  adapter, validateRequest, validateOrder, createService,
   title: 'Compras',
   description: 'Solicitação, cotação, pedido, contratos e aprovação',
   tiles: [

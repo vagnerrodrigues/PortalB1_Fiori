@@ -650,6 +650,12 @@ async function finalizeDraft(tenant, ctx, draftEntry) {
   return { ok: true };
 }
 
+/** DocEntry a partir do número visível (DocNum) do documento. */
+async function entryByDocNum(tenant, ctx, kind, docNum) {
+  const r = await sl.request(tenant, ctx.cookie, 'GET', `/${KINDS[kind].coll}?$select=DocEntry&$filter=DocNum eq ${Number(docNum)}&$orderby=DocEntry desc&$top=1`);
+  return ((r.value || [])[0] || {}).DocEntry || null;
+}
+
 /** Contatos de usuários B1 (para notificações por e-mail). Aceita InternalKey (número) ou UserCode (texto). */
 async function usersContact(tenant, ctx, ids) {
   const keys = [...new Set((ids || []).filter((x) => x !== null && x !== undefined && x !== ''))];
@@ -666,7 +672,7 @@ async function usersContact(tenant, ctx, ids) {
 
 module.exports = {
   name: 'service-layer',
-  warmup, mapLimit, readDraftHeaders, clearPending,
+  warmup, mapLimit, entryByDocNum, readDraftHeaders, clearPending,
   KINDS, kindByObj, createDocument, seriesForBranch, docTotal, mapDocStatus, approvalsForDrafts, mapApprovalStatus, summary, readDraft,
   usersContact,
   searchItems, listCostCenters, listWarehouses, listBranches, searchVendors,

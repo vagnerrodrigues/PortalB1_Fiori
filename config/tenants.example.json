@@ -9,7 +9,8 @@
       "compras",
       "despesas",
       "parceiros",
-      "relatorios"
+      "relatorios",
+      "ia"
     ],
     "moduleAccess": {
       "compras": {

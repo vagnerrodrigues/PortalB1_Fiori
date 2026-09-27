@@ -27,7 +27,7 @@ const { wrap, requireAjax, requireAuth, errorHandler } = require('./core/http');
 const MOCK = process.env.MOCK === '1';
 
 // ---------- Módulos registrados ----------
-const registry = ['compras', 'despesas', 'parceiros', 'relatorios', 'admin'].map((id) => require(`./modules/${id}`));
+const registry = ['compras', 'despesas', 'parceiros', 'relatorios', 'ia', 'admin'].map((id) => require(`./modules/${id}`));
 
 // ---------- Empresas (multi-tenant) ----------
 function loadTenants() {
@@ -148,6 +148,9 @@ registry.forEach((mod) => {
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada' }));
+
+// ---------- MCP: assistentes de IA (Claude, Copilot, Joule...) com token pessoal ----------
+app.use('/mcp', require('./mcp').createMcpRouter({ mock: MOCK, registry, tenantById }));
 
 // ---------- Front SAPUI5 ----------
 app.use('/brand', express.static(path.join(__dirname, '..', 'config', 'brand'))); // logos do cliente

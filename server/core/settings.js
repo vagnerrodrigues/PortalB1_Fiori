@@ -13,7 +13,7 @@ const CONFIG_DIR = path.join(__dirname, '..', '..', 'config');
 const dir = () => process.env.SETTINGS_DIR || path.join(CONFIG_DIR, 'settings');
 
 const DEFAULTS = {
-  general: { productName: '', portalUrl: '' },
+  general: { productName: '', portalUrl: '', aiEnabled: false },
   email: {
     enabled: false, host: '', port: 587, security: 'starttls', // starttls | ssl | none
     user: '', passwordEnc: null, fromName: '', fromAddress: '', replyTo: '', rejectUnauthorized: true
@@ -109,7 +109,8 @@ function save(tenantId, input) {
   const next = {
     general: {
       productName: String(g.productName ?? cur.general.productName).trim().slice(0, 40),
-      portalUrl: String(g.portalUrl ?? cur.general.portalUrl).trim().replace(/\/+$/, '')
+      portalUrl: String(g.portalUrl ?? cur.general.portalUrl).trim().replace(/\/+$/, ''),
+      aiEnabled: !!(g.aiEnabled ?? cur.general.aiEnabled)
     },
     email: {
       enabled: !!(m.enabled ?? cur.email.enabled),
@@ -130,4 +131,4 @@ function save(tenantId, input) {
   return publicView(tenantId);
 }
 
-module.exports = { load, publicView, save, smtpPassword, EVENTS };
+module.exports = { load, publicView, save, smtpPassword, EVENTS, encrypt, decrypt };

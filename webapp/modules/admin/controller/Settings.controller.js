@@ -49,6 +49,8 @@ sap.ui.define([
         o.testTo = this.getModel("cfg").getProperty("/testTo");
         this.getModel("cfg").setData(o);
         this.getOwnerComponent().setBranding(o.branding); // nome novo já no topo
+        // módulos que dependem das configurações (ex.: Assistente de IA) aparecem sem novo login
+        this.api.get("/api/me").then(function (oMe) { this.getOwnerComponent().setSession(oMe); }.bind(this)).catch(function () {});
         this.toast(this.text("admSaved"));
       }.bind(this)).catch(function () {});
     },

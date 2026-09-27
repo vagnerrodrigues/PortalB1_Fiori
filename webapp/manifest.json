@@ -194,6 +194,11 @@
           "target": "relatorios.run"
         },
         {
+          "name": "ia.connect",
+          "pattern": "assistente-ia",
+          "target": "ia.connect"
+        },
+        {
           "name": "admin.settings",
           "pattern": "configuracoes",
           "target": "admin.settings"
@@ -319,6 +324,11 @@
           "id": "comprasContract",
           "name": "modules.compras.view.Contract",
           "level": 3
+        },
+        "ia.connect": {
+          "id": "iaConnect",
+          "name": "modules.ia.view.Connect",
+          "level": 2
         }
       }
     }

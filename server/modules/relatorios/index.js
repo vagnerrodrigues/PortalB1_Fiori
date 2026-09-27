@@ -37,8 +37,30 @@ const queryCode = (id) => 'PB_R' + require('crypto').createHash('sha1').update(i
 const publicInfo = ({ id, title, category, description, params, columns }) =>
   ({ id, title, category: category || 'Geral', description: description || '', params: params || [], columns: columns || [] });
 
+/** Executa um relatório do catálogo (usado pela tela e pelo assistente de IA). Lança erro com status 400/404. */
+async function runReport(tenant, ctx, id, input, mock) {
+  const rep = catalogFor(tenant).find((x) => x.id === id);
+  if (!rep) { const e = new Error('Relatório não encontrado'); e.status = 404; throw e; }
+  const params = {};
+  for (const p of rep.params || []) {
+    const v = (input || {})[p.name] ?? '';
+    if (p.type === 'date' && !isDate(v)) { const e = new Error(`Informe uma data válida em "${p.label}"`); e.status = 400; throw e; }
+    params[p.name] = String(v).slice(0, 100);
+  }
+  const started = Date.now();
+  const out = mock
+    ? { rows: rep.mock ? rep.mock(params) : [], truncated: false }
+    : await sqlQuery.run(tenant, ctx, { code: queryCode(rep.id), name: `Portal B1 - ${rep.title}`, sql: rep.sql }, params);
+  const rows = out.rows.map((row) => { const o = { ...row }; delete o['odata.etag']; return o; });
+  const columns = rep.columns && rep.columns.length
+    ? rep.columns
+    : Object.keys(rows[0] || {}).map((k) => ({ key: k, label: k, type: typeof rows[0][k] === 'number' ? 'number' : 'text' }));
+  return { report: publicInfo(rep), columns, rows, truncated: out.truncated, ms: Date.now() - started };
+}
+
 module.exports = {
   id: 'relatorios',
+  catalogFor, publicInfo, runReport,
   title: 'Relatórios',
   description: 'Consultas e exportação',
   tiles: [
@@ -51,29 +73,9 @@ module.exports = {
     r.get('/', (req, res) => res.json(catalogFor(req.tenant).map(publicInfo)));
 
     r.post('/:id/run', wrap(async (req, res) => {
-      const rep = catalogFor(req.tenant).find((x) => x.id === req.params.id);
-      if (!rep) return res.status(404).json({ error: 'Relatório não encontrado' });
-
-      const input = (req.body && req.body.params) || {};
-      const params = {};
-      for (const p of rep.params || []) {
-        const v = input[p.name] ?? '';
-        if (p.type === 'date' && !isDate(v)) return res.status(400).json({ error: `Informe uma data válida em "${p.label}"` });
-        params[p.name] = String(v).slice(0, 100);
-      }
-
-      const started = Date.now();
-      const out = mock
-        ? { rows: rep.mock ? rep.mock(params) : [], truncated: false }
-        : await sqlQuery.run(req.tenant, req.session.ctx, { code: queryCode(rep.id), name: `Portal B1 - ${rep.title}`, sql: rep.sql }, params);
-
-      const rows = out.rows.map((row) => { const o = { ...row }; delete o['odata.etag']; return o; });
-      const columns = rep.columns && rep.columns.length
-        ? rep.columns
-        : Object.keys(rows[0] || {}).map((k) => ({ key: k, label: k, type: typeof rows[0][k] === 'number' ? 'number' : 'text' }));
-
-      audit(req, 'REPORT_RUN', { report: rep.id, rows: rows.length, ms: Date.now() - started });
-      res.json({ report: publicInfo(rep), columns, rows, truncated: out.truncated, ms: Date.now() - started });
+      const out = await runReport(req.tenant, req.session.ctx, req.params.id, req.body && req.body.params, mock);
+      audit(req, 'REPORT_RUN', { report: out.report.id, rows: out.rows.length, ms: out.ms });
+      res.json(out);
     }));
 
     return r;

@@ -49,6 +49,17 @@ O que fica no portal (`data/rfq/<empresa>/`) é só o convite, o token, o status
 
 **Publicação:** para o fornecedor abrir o link, publique na internet **apenas** a rota `/cotacao/*` e `/api/public/*` (com HTTPS) e preencha o **Endereço público** em Configurações. O resto do portal pode continuar só na rede interna.
 
+## Assistente de IA (MCP)
+
+O portal é um servidor **MCP** (Model Context Protocol) em `/mcp`: Claude, Copilot, ChatGPT e agentes da **Joule** (Joule Studio) conversam com o SAP B1 através dele.
+
+- **Ligar:** Configurações do portal > Geral > *Assistentes de IA (MCP)*. Sem isso, a tela e o `/mcp` ficam desligados.
+- **Conectar:** cada usuário abre **Assistente de IA**, gera um token pessoal (confirmando a senha do B1), escolhe *Somente consulta* ou *Consulta e ações* e a validade (30 a 365 dias). A tela mostra o comando pronto para Claude Code e a configuração do Claude Desktop.
+- **Identidade:** o assistente age **com o usuário B1 da pessoa**, com as mesmas permissões e alçadas. A senha fica cifrada (AES-256-GCM, `config/secret.key`) e é apagada ao revogar. Do token, só o hash é gravado (`data/ai-tokens`).
+- **Ferramentas:** aprovações pendentes, ver documento, aprovar/reprovar, minhas solicitações, buscar itens, criar solicitação, pedidos, cotações e mapa, contratos, relatórios. Elas respeitam o acesso por módulo e o perfil de comprador; ações só com token de escopo *ações*. Tudo fica na auditoria com `"via":"mcp"`.
+- **Joule:** no Joule Studio (SAP Build/BTP), cadastre este MCP por um Destination apontando para `https://<portal>/mcp`, via Cloud Connector se o portal for interno, com o cabeçalho `Authorization: Bearer <token>`.
+- **Publicação:** para assistentes na nuvem (claude.ai, Copilot, Joule), o `/mcp` precisa estar acessível por HTTPS. Para Claude Desktop/Code na rede da empresa, basta o endereço interno.
+
 ## Anexos (nativos do B1)
 
 Solicitação de compra e Despesas aceitam até 5 arquivos de até 10 MB (PDF, imagens, XML, Office, ZIP). O portal grava no objeto **Attachments2** e vincula ao documento pelo `AttachmentEntry`, que aparece na aba **Anexos** do client B1 e acompanha o rascunho quando ele vira documento.

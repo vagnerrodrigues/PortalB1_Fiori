@@ -213,7 +213,7 @@ const TOOLS = [
     name: 'ver_mapa_cotacao',
     module: 'compras',
     buyer: true,
-    description: 'Mapa de uma cotação online: por item, o preço de cada fornecedor, o menor preço e o vencedor sugerido; e o resumo (melhor preço por item x melhor fornecedor único).',
+    description: 'Mapa de uma cotação online: por item, preço, prazo (dias) e nota de cada fornecedor, e o recomendado por critério (menor preço, entrega mais rápida, equilíbrio preço x prazo); resumo com o total e o prazo médio de cada critério.',
     inputSchema: { type: 'object', properties: { numero: { type: 'integer' } }, required: ['numero'], additionalProperties: false },
     async run(c, a) {
       const r = c.rfq.get(c.req, a.numero);
@@ -223,12 +223,16 @@ const TOOLS = [
         fornecedores: r.suppliers.map((s) => ({ codigo: s.cardCode, nome: s.cardName, situacao: s.status, condicao_pagamento: s.answer && s.answer.paymentTerms, frete: s.answer && s.answer.freight })),
         itens: r.map.lines.map((l) => ({
           item: `${l.itemCode} - ${l.itemName}`, quantidade: l.quantity, menor_preco: l.bestPrice, vencedor: l.winner ? name[l.winner] : null,
-          ofertas: l.offers.filter((o) => o.quoted).map((o) => ({ fornecedor: name[o.cardCode], preco: o.unitPrice, total: o.total, entrega: o.deliveryDate }))
+          recomendado: { menor_preco: name[l.recommended.price], entrega_mais_rapida: name[l.recommended.speed], equilibrio: name[l.recommended.balance] },
+          ofertas: l.offers.filter((o) => o.quoted).map((o) => ({ fornecedor: name[o.cardCode], preco: o.unitPrice, total: o.total, entrega: o.deliveryDate, prazo_dias: o.leadDays, nota_equilibrio: o.score }))
         })),
         resumo: {
           melhor_preco_por_item: r.map.summary.bestMix,
           melhor_fornecedor_unico: r.map.summary.bestSingle ? { nome: name[r.map.summary.bestSingle.cardCode], total: r.map.summary.bestSingle.total } : null,
-          ganho_dividindo: r.map.summary.savingVsSingle
+          ganho_dividindo: r.map.summary.savingVsSingle,
+          por_criterio: {
+            menor_preco: r.map.byCriterion.price, entrega_mais_rapida: r.map.byCriterion.speed, equilibrio: r.map.byCriterion.balance
+          }
         }
       };
     }

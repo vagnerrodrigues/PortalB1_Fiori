@@ -26,6 +26,18 @@ async function vendorContact(tenant, ctx, cardCode) {
 // ---------- Listas ----------
 const LIST_SEL = '$select=DocEntry,DocNum,DocDate,DocDueDate,CardCode,CardName,DocTotal,DocCurrency,DocumentStatus,Cancelled,Comments,NumAtCard,BPL_IDAssignedToInvoice';
 
+/** Pedidos de compra do ano (painel): só cabeçalho, 500 por página. */
+async function ordersForYear(tenant, ctx, year) {
+  const y = Number(year);
+  const rows = await sl.getAll(tenant, ctx.cookie,
+    `/PurchaseOrders?$select=DocEntry,DocNum,DocDate,DocDueDate,DocTotal,DocumentStatus,Cancelled,CardCode,CardName` +
+    `&$filter=DocDate ge '${y}-01-01' and DocDate le '${y}-12-31'&$orderby=DocEntry`, 20000, 500);
+  return rows.map((d) => ({
+    entry: d.DocEntry, docNum: d.DocNum, date: d10(d.DocDate), dueDate: d10(d.DocDueDate), total: Number(d.DocTotal) || 0,
+    status: base.mapDocStatus(d), cardCode: d.CardCode, cardName: d.CardName
+  }));
+}
+
 /** Contagem leve (tile): pedidos/ofertas em aberto, sem ler documentos. */
 async function countOpen(tenant, ctx, kind) {
   return Number(await sl.request(tenant, ctx.cookie, 'GET',
@@ -271,7 +283,7 @@ async function setAgreementStatus(tenant, ctx, no, status) {
 }
 
 module.exports = {
-  vendorContact, listDocs, countOpen, openRequestLines,
+  vendorContact, listDocs, countOpen, ordersForYear, openRequestLines,
   createQuotation, writeQuotationAnswer, closeDoc, cancelDoc,
   createPurchaseOrder,
   listAgreements, getAgreement, createAgreement, setAgreementStatus

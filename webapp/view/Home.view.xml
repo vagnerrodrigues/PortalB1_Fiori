@@ -16,6 +16,7 @@
       </Bar>
     </customHeader>
     <content>
+      <VBox id="dash" class="sapUiMediumMarginBeginEnd sapUiMediumMarginTop" />
       <VBox id="modules" class="sapUiMediumMargin" />
     </content>
   </Page>

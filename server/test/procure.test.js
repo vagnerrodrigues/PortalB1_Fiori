@@ -129,7 +129,12 @@ async function main() {
     assert.strictEqual(m.lines[2].bestCardCode, 'F0002');
     assert.strictEqual(m.summary.bestSingle.cardCode, 'F0002'); // único que cotou tudo
     assert.strictEqual(m.summary.bestMix, Math.round((20 * 9.8 + 15 * 11.2 + 4 * 25) * 100) / 100);
-    ok('respostas gravadas nas ofertas do B1; mapa aponta menor preço por item e melhor fornecedor único');
+    assert.deepStrictEqual(m.lines[0].recommended, { price: 'F0001', speed: 'F0002', balance: 'F0002' });
+    assert.ok(m.lines[0].offers.find((o) => o.cardCode === 'F0002').fastest);
+    assert.strictEqual(m.lines[0].offers.find((o) => o.cardCode === 'F0001').leadDays, 7);
+    assert.ok(m.byCriterion.speed.avgDays <= m.byCriterion.price.avgDays);
+        ok('respostas gravadas nas ofertas do B1; mapa aponta menor preço por item e melhor fornecedor único');
+    ok('recomendação por critério: menor preço, entrega mais rápida e equilíbrio preço x prazo');
 
     // comprador lança resposta recebida por telefone
     const manual = await call('POST', `/api/m/compras/rfq/${rfq.id}/suppliers/F0004/answer`, {
@@ -202,6 +207,16 @@ async function main() {
     const counters = (await call('GET', '/api/m/compras/counters', null, buy)).json;
     assert.ok(counters.orders >= 4);
     ok('contadores de pedidos/cotações para o comprador');
+
+    const y = new Date().getFullYear();
+    assert.strictEqual((await call('GET', `/api/m/compras/dashboard?year=${y}`, null, req)).status, 403);
+    const dash = (await call('GET', `/api/m/compras/dashboard?year=${y}&refresh=1`, null, buy)).json;
+    assert.ok(dash.orders.count >= 4 && dash.orders.monthly.length === 12);
+    assert.ok(dash.orders.total > 0 && dash.orders.topVendors.length > 0);
+    assert.strictEqual(dash.rfq.awarded, 1);
+    assert.ok(dash.rfq.saving > 0, 'economia da cotação adjudicada');
+    assert.ok(dash.agreements.active >= 2);
+    ok('painel do comprador: compras no ano, atrasados, economia das cotações e contratos');
 
     console.log('\nCiclo de compras: todos os testes passaram.');
   } finally {

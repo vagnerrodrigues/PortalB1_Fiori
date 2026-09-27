@@ -16,9 +16,13 @@ sap.ui.define([
   "sap/m/ObjectNumber",
   "sap/m/ObjectStatus",
   "sap/m/Select",
-  "sap/ui/core/Item"
+  "sap/ui/core/Item",
+  "sap/m/HBox",
+  "sap/m/List",
+  "sap/m/CustomListItem",
+  "sap/m/Title"
 ], function (BaseController, JSONModel, MessageBox, Dialog, Button, CheckBox, Text, Label, DatePicker,
-  Table, Column, ColumnListItem, VBox, ObjectIdentifier, ObjectNumber, ObjectStatus, Select, Item) {
+  Table, Column, ColumnListItem, VBox, ObjectIdentifier, ObjectNumber, ObjectStatus, Select, Item, HBox, List, CustomListItem, Title) {
   "use strict";
 
   /**
@@ -28,7 +32,7 @@ sap.ui.define([
   return BaseController.extend("portal.b1.modules.compras.controller.Rfq", {
     onInit: function () {
       this.setModel(new JSONModel({}), "rfq");
-      this.setModel(new JSONModel({ tab: "map", selected: 0, winners: 0 }), "view");
+      this.setModel(new JSONModel({ tab: "map", selected: 0, winners: 0, criterion: "price" }), "view");
       this.setModel(new JSONModel({ vendorSuggest: [] }), "md");
       this.setModel(new JSONModel({}), "ans");
       this.getRouter().getRoute("compras.rfq").attachPatternMatched(this._onMatched, this);
@@ -69,6 +73,7 @@ sap.ui.define([
       o.suppliers.forEach(function (s) { this._names[s.cardCode] = s.cardName; }.bind(this));
       this._selection = {};
       o.map.lines.forEach(function (l) { this._selection[l.key] = l.winner || ""; }.bind(this));
+      this._critInfo();
       this._buildMap();
       this._recalc();
     },
@@ -101,7 +106,11 @@ sap.ui.define([
 
       o.map.lines.forEach(function (l) {
         var aCells = [
-          new ObjectIdentifier({ title: l.itemName || l.itemCode, text: l.itemCode + (l.requiredDate ? " · " + fmt.date(l.requiredDate) : "") }),
+          new VBox({ items: [
+            new ObjectIdentifier({ title: l.itemName || l.itemCode, text: l.itemCode + (l.requiredDate ? " · " + fmt.date(l.requiredDate) : "") }),
+            new Button({ text: this.text("rfqCompare"), icon: "sap-icon://compare", type: "Transparent", visible: l.offers.some(function (x) { return x.quoted; }),
+              press: this._openCompare.bind(this, l.key) }).addStyleClass("pbMapCompare")
+          ] }),
           new ObjectNumber({ number: String(l.quantity).replace(".", ","), unit: l.uom })
         ];
         aSup.forEach(function (s) {
@@ -111,7 +120,8 @@ sap.ui.define([
             oCell = new VBox({ alignItems: "End", items: [
               new ObjectNumber({ number: fmt.money(of.unitPrice), state: of.best ? "Success" : "None", emphasized: of.best }),
               new Text({ text: fmt.money(of.total) }),
-              new Text({ text: of.deliveryDate ? this.text("rfqDelivery", [fmt.date(of.deliveryDate)]) : "", visible: !!of.deliveryDate }),
+              new Text({ text: of.deliveryDate ? this.text("rfqDeliveryDays", [fmt.date(of.deliveryDate), of.leadDays]) : "", visible: !!of.deliveryDate }),
+              this._badges(l, of, "End"),
               new Text({ text: of.notes || "", visible: !!of.notes, wrapping: true })
             ] });
           } else {
@@ -131,6 +141,108 @@ sap.ui.define([
       }.bind(this));
       oBox.addItem(oTable);
       this._mapTable = oTable;
+    },
+
+    /** Selos da proposta: menor preço, mais rápida e recomendada pelo critério ativo. */
+    _badges: function (l, of, sAlign) {
+      var sCrit = this.getModel("view").getProperty("/criterion");
+      var aItems = [];
+      if (of.best) { aItems.push(new ObjectStatus({ text: this.text("rfqBadgePrice"), state: "Success", icon: "sap-icon://trend-down", inverted: true })); }
+      if (of.fastest) { aItems.push(new ObjectStatus({ text: this.text("rfqBadgeFast"), state: "Information", icon: "sap-icon://shipping-status", inverted: true })); }
+      if (l.recommended && l.recommended[sCrit] === of.cardCode) {
+        aItems.push(new ObjectStatus({ text: this.text("rfqBadgeRec"), state: "Indication05", icon: "sap-icon://favorite", inverted: true }));
+      }
+      return new HBox({ wrap: "Wrap", justifyContent: sAlign === "End" ? "End" : "Start", items: aItems.map(function (b) { return b.addStyleClass("pbBadge"); }) });
+    },
+
+    /** Troca de critério: redesenha os selos e mostra o resultado do critério. */
+    onCriterion: function () {
+      this._critInfo();
+      this._buildMap();
+      this._recalc();
+    },
+
+    _critInfo: function () {
+      var o = this.getModel("rfq").getData();
+      var c = o.map && o.map.byCriterion && o.map.byCriterion[this.getModel("view").getProperty("/criterion")];
+      this.getModel("view").setProperty("/critInfo", c ? this.text("rfqCritInfo", [this.formatter.money(c.total), c.avgDays === null ? "–" : String(c.avgDays).replace(".", ","), c.vendors]) : "");
+    },
+
+    /** Escolhe, em todos os itens, o fornecedor recomendado pelo critério ativo. */
+    onApplyCriterion: function () {
+      var sCrit = this.getModel("view").getProperty("/criterion");
+      this.getModel("rfq").getProperty("/map/lines").forEach(function (l) {
+        if (l.recommended && l.recommended[sCrit]) { this._selection[l.key] = l.recommended[sCrit]; }
+      }.bind(this));
+      this._buildMap();
+      this._recalc();
+      this.toast(this.text("rfqApplied", [this.text("crit_" + sCrit)]));
+    },
+
+    /** Comparativo do item: propostas ranqueadas pelo critério ativo, com "Escolher". */
+    _openCompare: function (iKey) {
+      var o = this.getModel("rfq").getData();
+      var fmt = this.formatter;
+      var sCrit = this.getModel("view").getProperty("/criterion");
+      var l = o.map.lines.filter(function (x) { return x.key === iKey; })[0];
+      var bLocked = o.status === "AWARDED" || o.status === "CANCELLED";
+      var sort = {
+        price: function (a, b) { return a.unitPrice - b.unitPrice; },
+        speed: function (a, b) { return ((a.leadDays === null ? 1e9 : a.leadDays) - (b.leadDays === null ? 1e9 : b.leadDays)) || a.unitPrice - b.unitPrice; },
+        balance: function (a, b) { return (b.score - a.score) || a.unitPrice - b.unitPrice; }
+      }[sCrit];
+      var aOffers = l.offers.filter(function (x) { return x.quoted; }).sort(sort);
+      var oDialog;
+      var oList = new List({ showSeparators: "None" });
+      aOffers.forEach(function (of, i) {
+        var bChosen = this._selection[l.key] === of.cardCode;
+        oList.addItem(new CustomListItem({ content: [new VBox({ items: [
+          new HBox({ justifyContent: "SpaceBetween", alignItems: "Center", items: [
+            new VBox({ items: [
+              new Title({ text: (i + 1) + ". " + this._names[of.cardCode], level: "H4" }),
+              this._badges(l, of, "Start")
+            ] }),
+            new VBox({ alignItems: "End", items: [
+              new ObjectNumber({ number: fmt.money(of.total), emphasized: true, state: i === 0 ? "Success" : "None" }).addStyleClass("pbKpiValue"),
+              new Text({ text: this.text("rfqScore", [String(of.score).replace(".", ",")]) })
+            ] })
+          ] }),
+          new HBox({ wrap: "Wrap", items: [
+            this._fact(this.text("orderPrice"), fmt.money(of.unitPrice)),
+            this._fact(this.text("quantity"), String(l.quantity).replace(".", ",") + " " + (l.uom || "")),
+            this._fact(this.text("shipDate"), of.deliveryDate ? fmt.date(of.deliveryDate) : "–"),
+            this._fact(this.text("rfqLead"), of.leadDays === null ? "–" : this.text("rfqDays", [of.leadDays]))
+          ] }).addStyleClass("sapUiSmallMarginTop"),
+          new Text({ text: of.notes || "", visible: !!of.notes }),
+          new Button({
+            text: bChosen ? this.text("rfqChosen") : this.text("rfqChoose", [this._names[of.cardCode]]),
+            type: bChosen ? "Accept" : (i === 0 ? "Emphasized" : "Default"), width: "100%", enabled: !bLocked && !bChosen,
+            icon: bChosen ? "sap-icon://accept" : "sap-icon://cart",
+            press: function () {
+              this._selection[l.key] = of.cardCode;
+              oDialog.close();
+              this._buildMap();
+              this._recalc();
+            }.bind(this)
+          }).addStyleClass("sapUiSmallMarginTop")
+        ] }).addStyleClass("pbOfferCard" + (i === 0 ? " pbOfferTop" : ""))] }));
+      }.bind(this));
+      oDialog = new Dialog({
+        title: this.text("rfqCompareTitle", [l.itemName || l.itemCode]), contentWidth: "40rem", resizable: true, draggable: true,
+        subHeader: undefined,
+        content: [new VBox({ items: [
+          new Text({ text: this.text("rfqCompareSub", [this.text("crit_" + sCrit)]) }).addStyleClass("sapUiSmallMarginBottom"),
+          oList
+        ] }).addStyleClass("sapUiSmallMargin")],
+        endButton: new Button({ text: this.text("cancel"), press: function () { oDialog.close(); } }),
+        afterClose: function () { oDialog.destroy(); }
+      });
+      this.getView().addDependent(oDialog);
+      oDialog.open();
+    },
+
+    _fact: function (sLabel, sValue) {
+      return new VBox({ items: [new Label({ text: sLabel }), new Text({ text: sValue }).addStyleClass("pbFactValue")] }).addStyleClass("pbFact");
     },
 
     _onWinner: function (iKey, oEvent) {

@@ -271,6 +271,33 @@ async function createPurchaseOrder(_t, _c, user, p) {
   return create('po', user, { ...p, lines, requiredDate: p.dueDate });
 }
 
+// Histórico de pedidos para o painel da demonstração (ano atual e anterior)
+let seeded = false;
+function seedHistory() {
+  if (seeded) return;
+  seeded = true;
+  const y = new Date().getFullYear();
+  const monthNow = new Date().getMonth();
+  let n = 400;
+  [y - 1, y].forEach((year) => {
+    for (let m = 0; m < 12; m++) {
+      if (year === y && m > monthNow) break;
+      const perMonth = 2 + ((m * 7 + year) % 4);
+      for (let k = 0; k < perMonth; k++) {
+        const v = VENDORS[(m + k) % VENDORS.length];
+        const date = `${year}-${String(m + 1).padStart(2, '0')}-${String(3 + k * 6).padStart(2, '0')}`;
+        const due = new Date(Date.parse(date) + (10 + k * 5) * 864e5).toISOString().slice(0, 10);
+        const total = Math.round((1800 + ((m + 1) * 937 + k * 1511 + year) % 9000) * 100) / 100;
+        const open = year === y && m >= monthNow - 1;
+        n += 1;
+        db.po.push({ kind: 'po', entry: n, docNum: n, docDate: date, dueDate: due, requiredDate: due, cardCode: v.cardCode, cardName: v.cardName,
+          numAtCard: '', requester: 'comprador', requesterName: 'Diego Comprador', originatorId: 13, comments: 'Histórico (demonstração)',
+          currency: 'R$', total, lines: [], status: open ? 'OPEN' : 'CLOSED', docType: 'items', attachmentEntry: null, branch: null });
+      }
+    }
+  });
+}
+
 // Contratos guarda-chuva
 function seedAgreements() {
   if (db.agreements.length) return;
@@ -327,6 +354,8 @@ async function setAgreementStatus(_t, _c, no, status) {
   a.status = status;
 }
 
+seedHistory(); // demonstração já abre com pedidos no painel e na lista
+
 module.exports = {
   usersContact,
   name: 'mock',
@@ -335,6 +364,8 @@ module.exports = {
   listPendingApprovals, countPendingApprovals: async (t, c, u) => (await listPendingApprovals(t, c, u)).length,
   countMyRequests: async (t, c, u) => (await listMyRequests(t, c, u)).filter((x) => ['PENDING', 'APPROVED', 'OPEN'].includes(x.status)).length, decide, finalizeDraft,
   entryByDocNum: async (_t, _c, kind, docNum) => ((db[kind] || []).find((d) => d.docNum === Number(docNum)) || {}).entry || null,
+  ordersForYear: async (_t, _c, year) => { seedHistory(); return db.po.filter((d) => String(d.docDate).startsWith(String(year)))
+    .map((d) => ({ entry: d.entry, docNum: d.docNum, date: d.docDate, dueDate: d.dueDate, total: d.total, status: d.status, cardCode: d.cardCode, cardName: d.cardName })); },
   countOpen: async (_t, _c, kind) => db[kind].filter((d) => d.status === 'OPEN').length,
   vendorContact, listDocs, openRequestLines, createQuotation, writeQuotationAnswer, closeDoc, cancelDoc, createPurchaseOrder,
   listAgreements, getAgreement, createAgreement, setAgreementStatus,

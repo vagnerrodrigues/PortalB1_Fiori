@@ -43,6 +43,20 @@
                 <Text text="{view>/selectedInfo}" />
               </VBox>
             </FlexBox>
+            <OverflowToolbar class="pbCritBar">
+              <Label text="{i18n>rfqCriterion}" />
+              <SegmentedButton selectedKey="{view>/criterion}" selectionChange=".onCriterion">
+                <items>
+                  <SegmentedButtonItem key="price" text="{i18n>crit_price}" icon="sap-icon://money-bills" />
+                  <SegmentedButtonItem key="speed" text="{i18n>crit_speed}" icon="sap-icon://shipping-status" />
+                  <SegmentedButtonItem key="balance" text="{i18n>crit_balance}" icon="sap-icon://compare-2" />
+                </items>
+              </SegmentedButton>
+              <Text text="{view>/critInfo}" />
+              <ToolbarSpacer />
+              <Button text="{i18n>rfqApplyRec}" icon="sap-icon://favorite" press=".onApplyCriterion"
+                visible="{= ${rfq>/status} !== 'AWARDED' &amp;&amp; ${rfq>/status} !== 'CANCELLED' }" />
+            </OverflowToolbar>
             <VBox id="mapBox" />
           </IconTabFilter>
 

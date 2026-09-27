@@ -45,6 +45,22 @@ Relatórios padrão: contas a receber em aberto, contas a pagar em aberto, venda
 5. **Mapa de cotação:** mostra o menor preço por item, o melhor fornecedor único e o ganho de dividir a compra. O comprador escolhe o vencedor de cada item e também pode lançar propostas recebidas por telefone ou PDF.
 6. **Gerar pedidos:** cria um pedido por fornecedor vencedor, copiado da oferta, e fecha as ofertas de quem não ganhou nenhum item. Pedido acima da alçada vai para aprovação normalmente.
 
+**Critério de recomendação** no mapa e no botão *Comparar* de cada item:
+- **Menor preço:** o menor preço unitário.
+- **Entrega mais rápida:** o menor prazo em dias a partir de hoje.
+- **Equilíbrio preço × prazo:** 60% preço + 40% prazo, cada um comparado ao melhor do item. O prazo tem folga de 7 dias, para 1 ou 2 dias de diferença não pesarem mais que o preço.
+
+As propostas recebem selos (*Menor preço*, *Mais rápida*, *Recomendada*) e uma nota de 0 a 100. *Aplicar recomendação* escolhe o recomendado em todos os itens. A barra mostra o total, o prazo médio e o nº de fornecedores de cada critério.
+
+**Painel de compras** (tela inicial, para compradores), por ano:
+- compras no ano, com barras por mês;
+- pedidos em aberto e atrasados (entrega vencida);
+- economia das cotações adjudicadas: média das propostas − preço escolhido, × quantidade;
+- contratos ativos, com consumo e os que vencem em 60 dias;
+- maiores fornecedores.
+
+O painel fica 10 min em cache por empresa e carrega depois dos contadores, para não disputar a fila da sessão do SL.
+
 O que fica no portal (`data/rfq/<empresa>/`) é só o convite, o token, o status das respostas e a escolha do vencedor. Preços e documentos ficam no B1. **Inclua a pasta `data` no backup.**
 
 **Publicação:** para o fornecedor abrir o link, publique na internet **apenas** a rota `/cotacao/*` e `/api/public/*` (com HTTPS) e preencha o **Endereço público** em Configurações. O resto do portal pode continuar só na rede interna.

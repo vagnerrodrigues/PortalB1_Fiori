@@ -12,7 +12,8 @@ const express = require('express');
 const attachments = require('../../core/attachments');
 const notify = require('../../core/notify');
 const access = require('../../core/access');
-const { createService } = require('./rfq');
+const { createService, buildMap } = require('./rfq');
+const dashboard = require('./dashboard');
 
 const adapter = (mock) => (mock ? require('./mock') : { ...require('./sl'), ...require('./sl-procure') });
 const KIND_OK = ['pr', 'pq', 'po'];
@@ -324,6 +325,14 @@ module.exports = {
       await b1.setAgreementStatus(req.tenant, req.session.ctx, Number(req.params.no), st);
       audit(req, 'AGREEMENT_STATUS', { agreementNo: Number(req.params.no), status: st });
       res.json(await b1.getAgreement(req.tenant, req.session.ctx, Number(req.params.no)));
+    }));
+
+    // ---------- Painel do comprador ----------
+    r.get('/dashboard', buyerOnly, wrap(async (req, res) => {
+      const y = Number(req.query.year) || new Date().getFullYear();
+      if (y < 2000 || y > 2100) return res.status(400).json({ error: 'Ano inválido' });
+      if (req.query.refresh === '1') dashboard.clear(req.tenant.id);
+      res.json(await dashboard.build({ tenant: req.tenant, ctx: req.session.ctx, b1, year: y, buildMap }));
     }));
 
     // ---------- Cotação online ----------

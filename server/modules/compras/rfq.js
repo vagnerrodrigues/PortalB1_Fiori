@@ -57,6 +57,40 @@ function phase(rfq) {
 const canAnswer = (rfq) => phase(rfq) === 'OPEN';
 
 // ---------- mapa de cotação ----------
+const DAY = 864e5;
+const leadDays = (date) => (date ? Math.max(0, Math.round((Date.parse(date) - Date.parse(today())) / DAY)) : null);
+const CRITERIA = ['price', 'speed', 'balance'];
+
+/**
+ * Recomendação por item em 3 critérios:
+ *  price   = menor preço unitário
+ *  speed   = menor prazo de entrega (dias a partir de hoje; sem data = fica por último)
+ *  balance = equilíbrio: 60% preço + 40% prazo, cada um normalizado pelo melhor do item.
+ *            O prazo usa uma folga de 7 dias ((melhor+7)/(prazo+7)) para 1 ou 2 dias de diferença
+ *            não pesarem mais que o preço.
+ * Empates vão para o mais barato.
+ */
+function rankLine(offers) {
+  const valid = offers.filter((o) => o.quoted);
+  if (!valid.length) return { price: null, speed: null, balance: null };
+  const minPrice = Math.min(...valid.map((o) => o.unitPrice));
+  const dated = valid.filter((o) => o.leadDays !== null);
+  const minDays = dated.length ? Math.min(...dated.map((o) => o.leadDays)) : null;
+  valid.forEach((o) => {
+    const priceScore = minPrice / o.unitPrice;
+    const speedScore = o.leadDays === null || minDays === null ? 0 : (minDays + 7) / (o.leadDays + 7);
+    o.score = Math.round((0.6 * priceScore + 0.4 * speedScore) * 1000) / 10; // 0..100
+    o.fastest = minDays !== null && o.leadDays === minDays;
+  });
+  const pick = (cmp) => [...valid].sort((a, b) => cmp(a, b) || a.unitPrice - b.unitPrice)[0].cardCode;
+  return {
+    price: pick((a, b) => a.unitPrice - b.unitPrice),
+    speed: minDays === null ? pick((a, b) => a.unitPrice - b.unitPrice)
+      : pick((a, b) => (a.leadDays ?? 1e9) - (b.leadDays ?? 1e9)),
+    balance: pick((a, b) => b.score - a.score)
+  };
+}
+
 function buildMap(rfq) {
   const award = new Map(((rfq.award && rfq.award.lines) || []).map((x) => [x.key, x.cardCode]));
   const lines = rfq.lines.map((l) => {
@@ -68,9 +102,11 @@ function buildMap(rfq) {
         unitPrice: quoted ? Number(a.unitPrice) : null,
         total: quoted ? round2(Number(a.unitPrice) * l.quantity) : null,
         deliveryDate: quoted ? a.deliveryDate || null : null,
+        leadDays: quoted ? leadDays(a.deliveryDate) : null,
         notes: a ? a.notes || '' : ''
       };
     });
+    const recommended = rankLine(offers);
     const valid = offers.filter((o) => o.quoted);
     const best = valid.length ? valid.reduce((m, o) => (o.unitPrice < m.unitPrice ? o : m)) : null;
     const worst = valid.length ? valid.reduce((m, o) => (o.unitPrice > m.unitPrice ? o : m)) : null;
@@ -80,6 +116,7 @@ function buildMap(rfq) {
       bestCardCode: best ? best.cardCode : null,
       bestPrice: best ? best.unitPrice : null,
       spread: best && worst && worst.unitPrice ? Math.round((1 - best.unitPrice / worst.unitPrice) * 1000) / 10 : null,
+      recommended,
       winner: award.has(l.key) ? award.get(l.key) : (best ? best.cardCode : null)
     };
   });
@@ -102,8 +139,19 @@ function buildMap(rfq) {
     const o = l.offers.find((x) => x.cardCode === l.winner);
     return acc + (o && o.total ? o.total : 0);
   }, 0));
+  // Resultado de aplicar cada critério em todos os itens: total, prazo médio e nº de fornecedores
+  const byCriterion = Object.fromEntries(CRITERIA.map((c) => {
+    const chosen = lines.map((l) => l.offers.find((o) => o.cardCode === l.recommended[c])).filter(Boolean);
+    const days = chosen.filter((o) => o.leadDays !== null).map((o) => o.leadDays);
+    return [c, {
+      total: round2(chosen.reduce((acc, o) => acc + o.total, 0)),
+      avgDays: days.length ? Math.round((days.reduce((a, b) => a + b, 0) / days.length) * 10) / 10 : null,
+      maxDays: days.length ? Math.max(...days) : null,
+      vendors: new Set(chosen.map((o) => o.cardCode)).size
+    }];
+  }));
   return {
-    lines, suppliers,
+    lines, suppliers, byCriterion,
     summary: {
       bestMix, selected,
       bestSingle: bestSingle ? { cardCode: bestSingle.cardCode, total: bestSingle.total } : null,

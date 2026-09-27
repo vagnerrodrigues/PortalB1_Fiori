@@ -102,8 +102,8 @@ sap.ui.define([
     toast: function (sMsg) { MessageToast.show(sMsg); },
 
     // ---------- Compras: navegação e buscas compartilhadas ----------
-    KIND_SLUG: { pr: "solicitacao", pq: "oferta", po: "pedido" },
-    SLUG_KIND: { solicitacao: "pr", oferta: "pq", pedido: "po" },
+    KIND_SLUG: { pr: "solicitacao", pq: "oferta", po: "pedido", gr: "recebimento" },
+    SLUG_KIND: { solicitacao: "pr", oferta: "pq", pedido: "po", recebimento: "gr" },
 
     /** Abre o detalhe de um documento de compras (solicitação, oferta ou pedido). */
     navToDoc: function (sKind, sSource, vEntry, oQuery, bReplace) {

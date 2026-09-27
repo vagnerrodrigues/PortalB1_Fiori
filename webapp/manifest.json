@@ -149,6 +149,16 @@
           "target": "compras.contract"
         },
         {
+          "name": "compras.receipts",
+          "pattern": "compras/recebimentos",
+          "target": "compras.receipts"
+        },
+        {
+          "name": "compras.receive",
+          "pattern": "compras/receber/{entry}",
+          "target": "compras.receive"
+        },
+        {
           "name": "compras.detail",
           "pattern": "compras/{kind}/{source}/{entry}:?query:",
           "target": "compras.detail"
@@ -329,6 +339,16 @@
           "id": "iaConnect",
           "name": "modules.ia.view.Connect",
           "level": 2
+        },
+        "compras.receipts": {
+          "id": "comprasReceipts",
+          "name": "modules.compras.view.Receipts",
+          "level": 2
+        },
+        "compras.receive": {
+          "id": "comprasReceive",
+          "name": "modules.compras.view.Receive",
+          "level": 3
         }
       }
     }

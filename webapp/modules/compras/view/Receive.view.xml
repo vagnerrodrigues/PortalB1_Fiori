@@ -1,0 +1,70 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Receive"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:f="sap.ui.layout.form" xmlns:core="sap.ui.core"
+  core:require="{ Float: 'sap/ui/model/type/Float' }">
+  <Page title="{parts: [{value: 'recTitle'}, 'po>/docNum'], formatter: '.formatter.txt'}" showNavButton="true" navButtonPress=".onNavBack">
+    <content>
+      <ObjectHeader title="{po>/cardName}" responsive="true" backgroundDesign="Transparent">
+        <ObjectAttribute title="{i18n>supplier}" text="{po>/cardCode}" />
+        <ObjectAttribute title="{i18n>kind_po}" text="N&#186; {po>/docNum}" active="true" press=".onOpenPo" />
+        <ObjectAttribute title="{i18n>dueDate}" text="{path: 'po>/dueDate', formatter: '.formatter.date'}" />
+      </ObjectHeader>
+      <f:SimpleForm editable="true" layout="ResponsiveGridLayout" labelSpanL="3" labelSpanM="3" columnsL="1" columnsM="1">
+        <Label text="{i18n>recDate}" required="true" />
+        <DatePicker value="{rec>/date}" valueFormat="yyyy-MM-dd" displayFormat="medium" maxDate="{rec>/maxDate}" width="14rem" />
+        <Label text="{i18n>recInvoice}" />
+        <Input value="{rec>/numAtCard}" maxLength="100" width="22rem" placeholder="{i18n>recInvoicePh}" />
+        <Label text="{i18n>comments}" />
+        <TextArea value="{rec>/comments}" maxLength="254" rows="2" growing="true" />
+      </f:SimpleForm>
+
+      <Table items="{rec>/lines}" noDataText="{i18n>recNothing}" class="sapUiResponsiveContentPadding">
+        <headerToolbar>
+          <OverflowToolbar>
+            <Title text="{i18n>items}" />
+            <ToolbarSpacer />
+            <Button text="{i18n>recAll}" icon="sap-icon://accept" press=".onFillAll" />
+            <Button text="{i18n>recNone2}" icon="sap-icon://clear-all" press=".onClearAll" />
+          </OverflowToolbar>
+        </headerToolbar>
+        <columns>
+          <Column><Text text="{i18n>item}" /></Column>
+          <Column hAlign="End" width="7rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>recOrdered}" /></Column>
+          <Column hAlign="End" width="7rem"><Text text="{i18n>recOpen}" /></Column>
+          <Column hAlign="End" width="9rem"><Text text="{i18n>recQty}" /></Column>
+          <Column width="12rem" minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>warehouse}" /></Column>
+          <Column width="16rem" minScreenWidth="Desktop" demandPopin="true"><Text text="{i18n>recBatch}" /></Column>
+        </columns>
+        <items>
+          <ColumnListItem highlight="{= ${rec>serial} ? 'Error' : (${rec>quantity} > 0 ? 'Success' : 'None') }">
+            <ObjectIdentifier title="{rec>itemCode}" text="{rec>itemName}" />
+            <ObjectNumber number="{rec>ordered}" unit="{rec>uom}" />
+            <ObjectNumber number="{rec>open}" unit="{rec>uom}" emphasized="true" />
+            <Input value="{path: 'rec>quantity', type: 'Float', formatOptions: {minFractionDigits: 0, maxFractionDigits: 3}}" textAlign="End"
+              enabled="{= !${rec>serial} }" valueState="{= ${rec>quantity} > ${rec>open} ? 'Error' : 'None' }" change=".onQty" />
+            <ComboBox selectedKey="{rec>warehouse}" items="{path: 'md>/warehouses', templateShareable: true}" width="100%" enabled="{= !${rec>serial} }">
+              <core:Item key="{md>code}" text="{md>code} - {md>name}" />
+            </ComboBox>
+            <VBox>
+              <HBox visible="{rec>batch}">
+                <Input value="{rec>batchNo}" placeholder="{i18n>recBatchNo}" width="8rem" required="true"
+                  valueState="{= ${rec>quantity} > 0 &amp;&amp; !${rec>batchNo} ? 'Warning' : 'None' }" />
+                <DatePicker value="{rec>expiry}" valueFormat="yyyy-MM-dd" displayFormat="short" placeholder="{i18n>recExpiry}" width="8rem" class="sapUiTinyMarginBegin" />
+              </HBox>
+              <ObjectStatus text="{i18n>recSerial}" state="Error" icon="sap-icon://bar-code" visible="{rec>serial}" />
+              <Text text="—" visible="{= !${rec>batch} &amp;&amp; !${rec>serial} }" />
+            </VBox>
+          </ColumnListItem>
+        </items>
+      </Table>
+
+      <core:Fragment fragmentName="portal.b1.view.fragments.AttachmentsPicker" type="XML" />
+    </content>
+    <footer>
+      <OverflowToolbar>
+        <Text text="{rec>/summary}" />
+        <ToolbarSpacer />
+        <Button text="{i18n>recSubmit}" type="Emphasized" icon="sap-icon://receipt" press=".onSubmit" enabled="{= ${rec>/count} > 0 }" />
+      </OverflowToolbar>
+    </footer>
+  </Page>
+</mvc:View>

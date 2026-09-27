@@ -22,7 +22,8 @@ const OBJ_PURCHASE_REQUEST = '1470000113';
 const KINDS = {
   pr: { obj: '1470000113', coll: 'PurchaseRequests', draftCode: 'oPurchaseRequest' },
   pq: { obj: '540000006', coll: 'PurchaseQuotations', draftCode: 'oPurchaseQuotations' },
-  po: { obj: '22', coll: 'PurchaseOrders', draftCode: 'oPurchaseOrders' }
+  po: { obj: '22', coll: 'PurchaseOrders', draftCode: 'oPurchaseOrders' },
+  gr: { obj: '20', coll: 'PurchaseDeliveryNotes', draftCode: 'oPurchaseDeliveryNotes' }
 };
 const ALL_OBJ = Object.values(KINDS).map((k) => k.obj);
 const kindByObj = (code) => Object.keys(KINDS).find((k) => KINDS[k].obj === String(code)) || null;

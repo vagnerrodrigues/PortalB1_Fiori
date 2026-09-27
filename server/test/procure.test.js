@@ -176,6 +176,40 @@ async function main() {
     assert.strictEqual(rel.nodes.filter((n) => n.kind === 'pq').length, 3); // as 3 ofertas da cotação
     ok('mapa de relações: solicitação → cotação → ofertas → pedido');
 
+    // ---------- recebimento de mercadorias ----------
+    const alm = await login('almoxarife');
+    const almTiles = (await call('GET', '/api/me', null, alm)).json.modules.find((x) => x.id === 'compras').tiles.map((t) => t.id);
+    assert.ok(almTiles.includes('receipts') && !almTiles.includes('orders') && !almTiles.includes('rfq'));
+    assert.strictEqual((await call('GET', '/api/m/compras/receipts/pending', null, req)).status, 403);
+    const toReceive = (await call('GET', '/api/m/compras/receipts/pending', null, alm)).json;
+    assert.ok(toReceive.some((x) => x.entry === po1.entry));
+    const toRec = (await call('GET', `/api/m/compras/receipts/po/${po1.entry}`, null, alm)).json;
+    assert.strictEqual(toRec.lines[0].open, 20);
+    const over = await call('POST', '/api/m/compras/receipts', { poEntry: po1.entry, date: day(0), lines: [{ lineNum: 0, quantity: 25 }] }, alm);
+    assert.strictEqual(over.status, 400);
+    const partial = await call('POST', '/api/m/compras/receipts', { poEntry: po1.entry, date: day(0), numAtCard: 'NF 1234',
+      lines: [{ lineNum: 0, quantity: 12, warehouse: '02' }] }, alm);
+    assert.strictEqual(partial.status, 201, JSON.stringify(partial.json));
+    assert.strictEqual((await call('GET', `/api/m/compras/receipts/po/${po1.entry}`, null, alm)).json.lines[0].open, 8);
+    const grDoc = (await call('GET', `/api/m/compras/docs/gr/doc/${partial.json.entry}`, null, alm)).json;
+    assert.strictEqual(grDoc.numAtCard, 'NF 1234');
+    assert.strictEqual(grDoc.lines[0].baseEntry, po1.entry);
+    const rest = await call('POST', '/api/m/compras/receipts', { poEntry: po1.entry, date: day(0), lines: [{ lineNum: 0, quantity: 8 }] }, alm);
+    assert.strictEqual(rest.status, 201);
+    assert.ok(!(await call('GET', '/api/m/compras/receipts/pending', null, alm)).json.some((x) => x.entry === po1.entry));
+    const relGr = (await call('GET', `/api/m/compras/docs/po/doc/${po1.entry}/relations`, null, buy)).json;
+    assert.strictEqual(relGr.nodes.filter((n) => n.kind === 'gr').length, 2);
+    ok('recebimento parcial e total do pedido pelo almoxarifado; mapa de relações mostra os 2 recebimentos');
+
+    // lote obrigatório
+    const poBatch = await call('POST', '/api/m/compras/orders', { cardCode: 'F0004', dueDate: day(5), lines: [{ itemCode: 'ES-0010', quantity: 10, unitPrice: 20 }] }, buy);
+    const recB = (await call('GET', `/api/m/compras/receipts/po/${poBatch.json.entry}`, null, alm)).json;
+    assert.strictEqual(recB.lines[0].batch, true);
+    assert.strictEqual((await call('POST', '/api/m/compras/receipts', { poEntry: poBatch.json.entry, date: day(0), lines: [{ lineNum: 0, quantity: 10 }] }, alm)).status, 400);
+    assert.strictEqual((await call('POST', '/api/m/compras/receipts', { poEntry: poBatch.json.entry, date: day(0),
+      lines: [{ lineNum: 0, quantity: 10, batch: 'L2609', expiry: day(365) }] }, alm)).status, 201);
+    ok('item com controle de lote exige lote (e validade opcional)');
+
     // ---------- contrato guarda-chuva + pedido consumindo ----------
     const agBad = await call('POST', '/api/m/compras/agreements', { cardCode: 'F0003', startDate: day(10), endDate: day(1), description: '', method: 'item', lines: [] }, buy);
     assert.strictEqual(agBad.status, 400);

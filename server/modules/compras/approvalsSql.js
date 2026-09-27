@@ -10,7 +10,7 @@
 const sqlQuery = require('../../core/sqlQuery');
 
 // SQLQueries do SL aceita um SQL restrito: sem subconsulta; filtros com AND/OR simples
-const OBJ_FILTER = '(T0."ObjType" = \'1470000113\' OR T0."ObjType" = \'540000006\' OR T0."ObjType" = \'22\')';
+const OBJ_FILTER = '(T0."ObjType" = \'1470000113\' OR T0."ObjType" = \'540000006\' OR T0."ObjType" = \'22\' OR T0."ObjType" = \'20\')';
 const COLS = 'T0."WddCode", T0."ObjType", T0."IsDraft", T0."DraftEntry", T0."DocEntry", T0."Status", T0."CurrStep", T0."OwnerID", ' +
   'T0."CreateDate", T0."Remarks", T1."StepCode", T1."UserID", T1."Status" AS "LineStatus", T1."Remarks" AS "LineRemarks", T1."UpdateDate"';
 // Cabeçalho do rascunho na mesma consulta: a lista de aprovações não precisa ler rascunho por rascunho

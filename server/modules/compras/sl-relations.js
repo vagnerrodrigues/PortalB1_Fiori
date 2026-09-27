@@ -14,6 +14,33 @@ const COLL = {
   gr: 'PurchaseDeliveryNotes', ap: 'PurchaseInvoices', rt: 'PurchaseReturns', cm: 'PurchaseCreditNotes'
 };
 const d10 = (s) => (s ? String(s).slice(0, 10) : null);
+const OBJ_OF = Object.fromEntries(Object.entries(BY_OBJ).map(([o, k]) => [k, Number(o)]));
+
+// Documentos que podem ser copiados a partir de cada tipo (destinos possíveis no B1)
+const TARGETS = { pr: ['pq', 'po'], pq: ['po'], po: ['gr', 'ap'], gr: ['ap', 'rt'], ap: ['cm'], rt: [], cm: [] };
+const noAny = new Set(); // empresas cujo SL não aceita any() em DocumentLines
+
+/**
+ * Busca TODOS os documentos copiados deste (a linha só guarda o último destino em TargetType):
+ * filtro nas linhas do destino por BaseType/BaseEntry. Se o SL não aceitar any(), fica só o TargetType.
+ */
+async function copiesOf(tenant, ctx, kind, entry) {
+  if (noAny.has(tenant.id)) return [];
+  const out = [];
+  for (const t of TARGETS[kind] || []) {
+    try {
+      const rows = await sl.getAll(tenant, ctx.cookie,
+        `/${COLL[t]}?$select=DocEntry&$filter=DocumentLines/any(l: l/BaseType eq ${OBJ_OF[kind]} and l/BaseEntry eq ${Number(entry)})`, 50);
+      rows.forEach((r) => out.push({ dir: 'down', kind: t, entry: Number(r.DocEntry) }));
+    } catch (e) {
+      if (e.status === 401) throw e;
+      noAny.add(tenant.id);
+      console.error(`[compras] mapa de relações: SL não aceita filtro nas linhas (${e.message}); usando só o último destino de cada linha`);
+      return out;
+    }
+  }
+  return out;
+}
 
 function linksOf(lines) {
   const links = new Map();
@@ -31,12 +58,17 @@ function linksOf(lines) {
 
 async function docLinks(tenant, ctx, kind, entry) {
   const d = await sl.request(tenant, ctx.cookie, 'GET', `/${COLL[kind]}(${Number(entry)})`);
+  const own = linksOf(d.DocumentLines);
+  const seen = new Set(own.links.map((l) => `${l.dir}:${l.kind}:${l.entry}`));
+  (await copiesOf(tenant, ctx, kind, entry)).forEach((l) => {
+    if (!seen.has(`${l.dir}:${l.kind}:${l.entry}`)) own.links.push(l);
+  });
   return {
     node: {
       kind, source: 'doc', entry: d.DocEntry, docNum: d.DocNum, date: d10(d.DocDate), total: base.docTotal(d),
       status: base.mapDocStatus(d), cardCode: d.CardCode || '', cardName: d.CardName || d.RequesterName || ''
     },
-    ...linksOf(d.DocumentLines)
+    ...own
   };
 }
 
@@ -54,4 +86,4 @@ async function draftLinks(tenant, ctx, draftEntry) {
   };
 }
 
-module.exports = { docLinks, draftLinks, linksOf, BY_OBJ, COLL };
+module.exports = { docLinks, draftLinks, linksOf, copiesOf, BY_OBJ, COLL };

@@ -17,7 +17,7 @@ const dashboard = require('./dashboard');
 const relations = require('./relations');
 
 const adapter = (mock) => (mock ? require('./mock') : { ...require('./sl'), ...require('./sl-procure'), ...require('./sl-relations') });
-const KIND_OK = ['pr', 'pq', 'po'];
+const KIND_OK = ['pr', 'pq', 'po', 'gr'];
 const today = () => new Date().toISOString().slice(0, 10);
 
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s)) && !isNaN(Date.parse(s));
@@ -90,6 +90,7 @@ module.exports = {
     { id: 'rfq', title: 'Cotações online', subtitle: 'Em andamento (sem pedido gerado)', icon: 'sap-icon://compare', route: 'compras.rfqs', counter: true, buyer: true },
     { id: 'offers', title: 'Ofertas de compra', subtitle: 'Propostas dos fornecedores', icon: 'sap-icon://sales-quote', route: 'compras.offers', buyer: true },
     { id: 'orders', title: 'Pedidos de compra', subtitle: 'Emitir e acompanhar', icon: 'sap-icon://sales-order', route: 'compras.orders', counter: true, buyer: true },
+    { id: 'receipts', title: 'Recebimento de mercadorias', subtitle: 'Pedidos a receber', icon: 'sap-icon://receipt', route: 'compras.receipts', counter: true, receiver: true },
     { id: 'contracts', title: 'Contratos guarda-chuva', subtitle: 'Acordos com fornecedores', icon: 'sap-icon://umbrella', route: 'compras.contracts', buyer: true },
     { id: 'approvals', title: 'Aprovações de compras', subtitle: 'Aguardando sua decisão', icon: 'sap-icon://approvals', route: 'compras.approvals', counter: true, critical: true }
   ],
@@ -123,6 +124,8 @@ module.exports = {
     const b1 = adapter(mock);
     const rfq = createService({ b1, tenantById });
     const r = express.Router();
+    const isReceiver = (req) => access.canTile(req.tenant, req.session.user, 'compras', { receiver: true });
+    const receiverOnly = (req, res, next) => (isReceiver(req) ? next() : res.status(403).json({ error: 'Função exclusiva do recebimento' }));
     const buyerOnly = (req, res, next) => (access.canTile(req.tenant, req.session.user, 'compras', { buyer: true })
       ? next() : res.status(403).json({ error: 'Função exclusiva de compradores' }));
     const cache = new Map();
@@ -157,6 +160,10 @@ module.exports = {
       if (approvals.status === 'fulfilled') out.approvals = approvals.value;
       if (rfqs.status === 'fulfilled' && rfqs.value !== undefined) out.rfq = rfqs.value;
       if (orders.status === 'fulfilled' && orders.value !== undefined) out.orders = orders.value;
+      if (isReceiver(req)) {
+        out.receipts = out.orders !== undefined ? out.orders
+          : await b1.countOpen(req.tenant, req.session.ctx, 'po').catch(() => undefined);
+      }
       counterCache.set(key, { at: Date.now(), value: out });
       res.json(out);
     }));
@@ -243,7 +250,9 @@ module.exports = {
         return null;
       }
       // Oferta/pedido efetivados: só comprador. Rascunho: quem aprova ou quem criou (checado no B1).
-      if (kind !== 'pr' && source === 'doc' && !access.canTile(req.tenant, req.session.user, 'compras', { buyer: true })) {
+      const canView = access.canTile(req.tenant, req.session.user, 'compras', { buyer: true }) ||
+        (['po', 'gr'].includes(kind) && isReceiver(req));
+      if (kind !== 'pr' && source === 'doc' && !canView) {
         res.status(403).json({ error: 'Função exclusiva de compradores' });
         return null;
       }
@@ -310,6 +319,53 @@ module.exports = {
         { ...req.body, attachments: undefined, attachmentEntry });
       audit(req, 'PO_CREATE', result);
       if (result.source === 'draft') notify.approvalRequested(req, b1, result.entry);
+      res.status(201).json(result);
+    }));
+
+    // ---------- Recebimento de mercadorias ----------
+    r.get('/receipts/pending', receiverOnly, wrap(async (req, res) => {
+      const list = await b1.listDocs(req.tenant, req.session.ctx, req.session.user, 'po', { status: 'open' });
+      const today = new Date().toISOString().slice(0, 10);
+      res.json(list.filter((x) => x.source === 'doc').map((x) => ({ ...x, late: !!(x.dueDate && String(x.dueDate).slice(0, 10) < today) })));
+    }));
+
+    r.get('/receipts/po/:entry', receiverOnly, wrap(async (req, res) => {
+      if (!/^\d+$/.test(req.params.entry)) return res.status(400).json({ error: 'Parâmetro inválido' });
+      res.json(await b1.poForReceipt(req.tenant, req.session.ctx, Number(req.params.entry)));
+    }));
+
+    r.post('/receipts', receiverOnly, wrap(async (req, res) => {
+      const p = req.body || {};
+      if (!/^\d+$/.test(String(p.poEntry || ''))) return res.status(400).json({ error: 'Pedido inválido' });
+      const po = await b1.poForReceipt(req.tenant, req.session.ctx, Number(p.poEntry));
+      const errors = [];
+      if (po.status !== 'OPEN') errors.push('Pedido não está em aberto');
+      if (!isDate(p.date) || p.date > today()) errors.push('Data do recebimento inválida');
+      const lines = (Array.isArray(p.lines) ? p.lines : []).filter((l) => Number(l.quantity) > 0);
+      if (!lines.length) errors.push('Informe a quantidade recebida de ao menos um item');
+      lines.forEach((l) => {
+        const pl = po.lines.find((x) => Number(x.lineNum) === Number(l.lineNum));
+        if (!pl) { errors.push(`Linha ${Number(l.lineNum) + 1}: não está em aberto no pedido`); return; }
+        const name = pl.itemName || pl.itemCode;
+        if (Number(l.quantity) > pl.open + 1e-9) errors.push(`${name}: recebendo ${l.quantity}, mas só faltam ${pl.open} ${pl.uom || ''}`.trim());
+        if (pl.serial) errors.push(`${name}: item controlado por número de série — registre este recebimento no SAP`);
+        if (pl.batch && !String(l.batch || '').trim()) errors.push(`${name}: informe o lote`);
+        if (l.expiry && !isDate(l.expiry)) errors.push(`${name}: validade inválida`);
+        l.batch = pl.batch ? String(l.batch).trim() : null;
+      });
+      if (p.comments && String(p.comments).length > 254) errors.push('Observações: máximo 254 caracteres');
+      if (errors.length) return res.status(400).json({ error: errors.join('; '), errors });
+      const att = attachments.parse(p.attachments);
+      if (att.errors.length) return res.status(400).json({ error: att.errors.join('; ') });
+      const attachmentEntry = await attachments.upload(req.tenant, req.session.ctx, att.files, mock);
+      const result = await b1.createGoodsReceipt(req.tenant, req.session.ctx, req.session.user, {
+        poEntry: po.entry, cardCode: po.cardCode, branch: po.branch, date: p.date, numAtCard: String(p.numAtCard || '').slice(0, 100),
+        comments: p.comments, attachmentEntry,
+        lines: lines.map((l) => ({ lineNum: Number(l.lineNum), quantity: Number(l.quantity), warehouse: l.warehouse, batch: l.batch, expiry: l.expiry || undefined }))
+      });
+      audit(req, 'GR_CREATE', { ...result, poEntry: po.entry });
+      if (result.source === 'draft') notify.approvalRequested(req, b1, result.entry);
+      if (dashboard.clear) dashboard.clear(req.tenant.id);
       res.status(201).json(result);
     }));
 

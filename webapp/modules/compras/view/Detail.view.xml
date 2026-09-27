@@ -11,7 +11,7 @@
         <ObjectAttribute title="{i18n>supplier}" text="{doc>/cardCode} - {doc>/cardName}" visible="{= !!${doc>/cardCode} }" />
         <ObjectAttribute title="{i18n>requester}" text="{doc>/requesterName}" visible="{= !!${doc>/requesterName} }" />
         <ObjectAttribute title="{i18n>docDate}" text="{path: 'doc>/docDate', formatter: '.formatter.date'}" />
-        <ObjectAttribute title="{i18n>requiredDate}" text="{path: 'doc>/requiredDate', formatter: '.formatter.date'}" visible="{= ${doc>/kind} !== 'po' }" />
+        <ObjectAttribute title="{i18n>requiredDate}" text="{path: 'doc>/requiredDate', formatter: '.formatter.date'}" visible="{= ${doc>/kind} === 'pr' || ${doc>/kind} === 'pq' }" />
         <ObjectAttribute title="{= ${doc>/kind} === 'pq' ? ${i18n>validUntil} : ${i18n>dueDate} }" text="{path: 'doc>/dueDate', formatter: '.formatter.date'}" visible="{= ${doc>/kind} !== 'pr' &amp;&amp; !!${doc>/dueDate} }" />
         <ObjectAttribute title="{i18n>numAtCard}" text="{doc>/numAtCard}" visible="{= !!${doc>/numAtCard} }" />
         <ObjectAttribute title="{i18n>comments}" text="{path: 'doc>/comments', formatter: '.formatter.cleanComments'}" visible="{= !!${doc>/comments} }" />
@@ -90,8 +90,9 @@
       </Table>
     </content>
     <footer>
-      <OverflowToolbar visible="{= ${view>/mode} === 'approve' || (${doc>/source} === 'draft' &amp;&amp; ${doc>/status} === 'APPROVED')}">
+      <OverflowToolbar visible="{= ${view>/mode} === 'approve' || (${doc>/source} === 'draft' &amp;&amp; ${doc>/status} === 'APPROVED') || ${view>/canReceive} }">
         <ToolbarSpacer />
+        <Button text="{i18n>recReceive}" type="Emphasized" icon="sap-icon://receipt" press=".onReceive" visible="{view>/canReceive}" />
         <Button text="{i18n>finalize}" type="Emphasized" icon="sap-icon://accept" press=".onFinalize"
           visible="{= ${view>/mode} !== 'approve' &amp;&amp; ${doc>/source} === 'draft' &amp;&amp; ${doc>/status} === 'APPROVED'}" />
         <Button text="{i18n>approve}" type="Accept" icon="sap-icon://accept" press=".onDecide(true)"

@@ -52,7 +52,15 @@ Relatórios padrão: contas a receber em aberto, contas a pagar em aberto, venda
 
 As propostas recebem selos (*Menor preço*, *Mais rápida*, *Recomendada*) e uma nota de 0 a 100. *Aplicar recomendação* escolhe o recomendado em todos os itens. A barra mostra o total, o prazo médio e o nº de fornecedores de cada critério.
 
-**Mapa de relações** (no detalhe de solicitação, oferta e pedido): mostra, em cards ligados por setas, a cadeia solicitação → cotação online → ofertas → pedido → recebimento → nota fiscal/devolução, mais o contrato guarda-chuva consumido. Clique no card para abrir o documento. Usa só vínculos nativos das linhas (`BaseType/BaseEntry` para trás, `TargetType/TargetAbsEntry` para frente, `AgreementNo`) e a cotação do portal. Limite de 25 documentos por mapa.
+**Recebimento de mercadorias** (tile *Recebimento de mercadorias* e botão *Receber mercadorias* no pedido):
+- A lista mostra os pedidos em aberto, com os atrasados primeiro.
+- Na tela de recebimento, o almoxarifado informa, por linha: a quantidade recebida (parcial ou total), o depósito e o lote/validade quando o item controla lote. Informa também o nº da NF (`NumAtCard`), observações e anexos (PDF/XML da NF).
+- Gera o **Recebimento de mercadorias (OPDN)** copiado do pedido (`BaseType 22`). O saldo continua em aberto no pedido, e o procedimento de autorização, se houver, vale igual.
+- Itens com nº de série continuam sendo recebidos no SAP.
+- **Quem recebe:** `moduleAccess.compras.receivers { "departments": [...], "users": [...] }`, além dos compradores. Sem regra de compradores nem de recebedores, todos que acessam Compras recebem.
+- **Validar no B1 real:** a localização Brasil pode exigir campos fiscais (utilização, CFOP etc.) no recebimento. O portal copia do pedido; se o SL recusar, o erro aparece na tela.
+
+**Mapa de relações** (no detalhe de solicitação, oferta e pedido): mostra, em cards ligados por setas, a cadeia solicitação → cotação online → ofertas → pedido → recebimento → nota fiscal/devolução, mais o contrato guarda-chuva consumido. Clique no card para abrir o documento. Usa vínculos nativos: `BaseType/BaseEntry` para trás. Para frente, busca todas as cópias com filtro nas linhas de destino (`DocumentLines/any(...)`); se o SL não aceitar, usa `TargetType/TargetAbsEntry`, que guarda só a última cópia. Usa também `AgreementNo` e a cotação do portal. Limite de 25 documentos por mapa.
 
 **Painel de compras** (tela inicial, para compradores), por ano:
 - compras no ano, com barras por mês;

@@ -16,6 +16,7 @@ sl.request = async (t, c, method, p, body) => {
     throw e;
   }
   if (method === 'POST' && p === '/BlanketAgreements') return { AgreementNo: 7 };
+  if (method === 'POST' && p === '/PurchaseDeliveryNotes') return { DocEntry: 55, DocNum: 8055 };
   return {};
 };
 const proc = require('../modules/compras/sl-procure');
@@ -66,6 +67,17 @@ const proc = require('../modules/compras/sl-procure');
   assert.strictEqual(agBody.Status, 'asApproved');
   assert.deepStrictEqual(agBody.BlanketAgreements_ItemsLines[0], { ItemNo: 'A1', PlannedQuantity: 100, UnitPrice: 3.5 });
   console.log('  ✔ contrato guarda-chuva (BlanketAgreements) por item');
+
+  const gr = await proc.createGoodsReceipt({ id: 't' }, {}, { userCode: 'u' }, {
+    poEntry: 101, cardCode: 'F1', date: '2026-09-27', numAtCard: 'NF 1234',
+    lines: [{ lineNum: 0, quantity: 12, warehouse: '02' }, { lineNum: 2, quantity: 5, batch: 'L1', expiry: '2027-09-01' }]
+  });
+  assert.deepStrictEqual(gr, { kind: 'gr', source: 'doc', entry: 55, docNum: 8055, status: 'OPEN' });
+  const grBody = calls.find((c) => c.p === '/PurchaseDeliveryNotes').body;
+  assert.strictEqual(grBody.NumAtCard, 'NF 1234');
+  assert.deepStrictEqual(grBody.DocumentLines[0], { BaseType: 22, BaseEntry: 101, BaseLine: 0, Quantity: 12, WarehouseCode: '02', BatchNumbers: undefined });
+  assert.deepStrictEqual(grBody.DocumentLines[1].BatchNumbers, [{ BatchNumber: 'L1', Quantity: 5, ExpiryDate: '2027-09-01' }]);
+  console.log('  ✔ recebimento de mercadorias copiado do pedido (BaseType 22) com lote e validade');
 
   const { linksOf } = require('../modules/compras/sl-relations');
   const lk = linksOf([

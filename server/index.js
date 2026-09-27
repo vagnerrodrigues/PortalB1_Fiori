@@ -40,7 +40,8 @@ function loadTenants() {
       // demo do controle de acesso: requisitante (depto 1) = Compras; comercial (depto 3) = Parceiros;
       // aprovador é superusuário (vê tudo); Relatórios liberado para todos
       // comprador (depto 4) vê as telas de comprador de Compras (cotação, ofertas, pedidos, contratos)
-      moduleAccess: { compras: { departments: [1, 2, 4], buyers: { departments: [4] } }, parceiros: { departments: [2, 3] } }
+      // almoxarife (depto 5) só vê Compras > Recebimento de mercadorias (+ solicitação e aprovações)
+      moduleAccess: { compras: { departments: [1, 2, 4, 5], buyers: { departments: [4] }, receivers: { departments: [5] } }, parceiros: { departments: [2, 3] } }
     }];
   }
   const file = process.env.TENANTS_FILE || path.join(__dirname, '..', 'config', 'tenants.json');
@@ -87,8 +88,9 @@ function describe(tenant, user) {
     modules: access.modulesForUser(tenant, user, registry)
       .map(({ id, title, description, tiles }) => ({
         id, title, description,
-        tiles: tiles.filter((t) => access.canTile(tenant, user, id, t)).map(({ buyer, ...t }) => t),
-        buyer: tiles.some((t) => t.buyer) && access.canTile(tenant, user, id, { buyer: true })
+        tiles: tiles.filter((t) => access.canTile(tenant, user, id, t)).map(({ buyer, receiver, ...t }) => t),
+        buyer: tiles.some((t) => t.buyer) && access.canTile(tenant, user, id, { buyer: true }),
+        receiver: tiles.some((t) => t.receiver) && access.canTile(tenant, user, id, { receiver: true })
       }))
   };
 }

@@ -32,12 +32,18 @@ function canAccess(tenant, user, moduleId, mod) {
  * Tiles de comprador (buyer: true) dentro de um módulo: tenants.json > moduleAccess.<módulo>.buyers
  *   "compras": { "departments": [1, 2], "buyers": { "departments": [4], "users": ["joao"] } }
  * Sem "buyers" configurado, todos que acessam o módulo veem essas telas.
+ * Tiles de recebimento (receiver: true): moduleAccess.<módulo>.receivers { departments, users } + compradores.
  */
 function canTile(tenant, user, moduleId, tile) {
-  if (!tile || !tile.buyer || user.superuser) return true;
-  const rule = ((tenant.moduleAccess || {})[moduleId] || {}).buyers;
-  if (!rule) return true;
-  return (rule.departments || []).includes(user.department) || (rule.users || []).includes(user.userCode);
+  if (!tile || (!tile.buyer && !tile.receiver) || user.superuser) return true;
+  const acc = (tenant.moduleAccess || {})[moduleId] || {};
+  const match = (rule) => (rule.departments || []).includes(user.department) || (rule.users || []).includes(user.userCode);
+  // Recebimento: "receivers" (almoxarifado/portaria); compradores também recebem
+  if (tile.receiver) {
+    if (!acc.receivers && !acc.buyers) return true;
+    return (acc.receivers && match(acc.receivers)) || (acc.buyers ? match(acc.buyers) : !acc.receivers);
+  }
+  return acc.buyers ? match(acc.buyers) : true;
 }
 
 function modulesForUser(tenant, user, registry) {

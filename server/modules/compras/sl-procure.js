@@ -211,6 +211,55 @@ async function createPurchaseOrder(tenant, ctx, user, p) {
   return base.createDocument(tenant, ctx, 'po', body, (d) => d.CardCode === p.cardCode);
 }
 
+// ---------- Recebimento de mercadorias (OPDN) ----------
+/** Pedido com as linhas ainda a receber + controle de lote/série de cada item. */
+async function poForReceipt(tenant, ctx, entry) {
+  const d = await sl.request(tenant, ctx.cookie, 'GET', `/PurchaseOrders(${Number(entry)})`);
+  const lines = (d.DocumentLines || []).filter((l) => (l.LineStatus || 'bost_Open') === 'bost_Open')
+    .map((l) => ({
+      lineNum: l.LineNum, itemCode: l.ItemCode, itemName: l.ItemDescription, uom: l.UoMCode || l.MeasureUnit || '',
+      ordered: Number(l.Quantity) || 0, open: Number(l.RemainingOpenQuantity ?? l.Quantity) || 0,
+      unitPrice: l.UnitPrice ?? l.Price, warehouse: l.WarehouseCode || '', shipDate: d10(l.ShipDate)
+    })).filter((l) => l.open > 0);
+  const codes = [...new Set(lines.map((l) => l.itemCode).filter(Boolean))];
+  const flags = new Map();
+  for (let i = 0; i < codes.length; i += 20) {
+    const f = codes.slice(i, i + 20).map((c) => `ItemCode eq '${enc(q(c))}'`).join(' or ');
+    try {
+      const r = await sl.request(tenant, ctx.cookie, 'GET', `/Items?$select=ItemCode,ManageBatchNumbers,ManageSerialNumbers&$filter=${f}`);
+      (r.value || []).forEach((it) => flags.set(it.ItemCode, { batch: it.ManageBatchNumbers === 'tYES', serial: it.ManageSerialNumbers === 'tYES' }));
+    } catch (_) { /* sem leitura de itens: segue sem controle de lote */ }
+  }
+  lines.forEach((l) => Object.assign(l, flags.get(l.itemCode) || { batch: false, serial: false }));
+  return {
+    entry: d.DocEntry, docNum: d.DocNum, cardCode: d.CardCode, cardName: d.CardName, docDate: d10(d.DocDate), dueDate: d10(d.DocDueDate),
+    branch: d.BPL_IDAssignedToInvoice ?? null, status: base.mapDocStatus(d), numAtCard: d.NumAtCard || '', lines
+  };
+}
+
+/** Recebimento copiado do pedido (BaseType 22): quantidades, depósito e lotes. Aprovação nativa se houver. */
+async function createGoodsReceipt(tenant, ctx, user, p) {
+  const series = p.branch ? await base.seriesForBranch(tenant, ctx, Number(p.branch), 'gr') : undefined;
+  const body = {
+    CardCode: p.cardCode,
+    DocDate: p.date,
+    DocDueDate: p.date,
+    TaxDate: p.date,
+    BPL_IDAssignedToInvoice: p.branch ? Number(p.branch) : undefined,
+    Series: series,
+    NumAtCard: p.numAtCard || undefined,
+    Comments: String(p.comments || '').slice(0, 254) || undefined,
+    AttachmentEntry: p.attachmentEntry || undefined,
+    DocumentLines: p.lines.map((l) => ({
+      BaseType: 22, BaseEntry: Number(p.poEntry), BaseLine: Number(l.lineNum),
+      Quantity: Number(l.quantity),
+      WarehouseCode: l.warehouse || undefined,
+      BatchNumbers: l.batch ? [{ BatchNumber: String(l.batch).slice(0, 36), Quantity: Number(l.quantity), ExpiryDate: l.expiry || undefined }] : undefined
+    }))
+  };
+  return base.createDocument(tenant, ctx, 'gr', body, (d) => d.CardCode === p.cardCode);
+}
+
 // ---------- Contrato guarda-chuva (BlanketAgreements / OOAT) ----------
 const AG_STATUS = { asApproved: 'ACTIVE', asOnHold: 'ONHOLD', asDraft: 'DRAFT', asTerminated: 'TERMINATED', asCancelled: 'CANCELLED' };
 const AG_STATUS_B1 = Object.fromEntries(Object.entries(AG_STATUS).map(([k, v]) => [v, k]));
@@ -285,6 +334,6 @@ async function setAgreementStatus(tenant, ctx, no, status) {
 module.exports = {
   vendorContact, listDocs, countOpen, ordersForYear, openRequestLines,
   createQuotation, writeQuotationAnswer, closeDoc, cancelDoc,
-  createPurchaseOrder,
+  createPurchaseOrder, poForReceipt, createGoodsReceipt,
   listAgreements, getAgreement, createAgreement, setAgreementStatus
 };

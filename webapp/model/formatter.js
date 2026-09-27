@@ -84,7 +84,7 @@ sap.ui.define([
     },
     docStatusText: function (sKind, sStatus) {
       if (!oBundle || !sStatus) { return sStatus || ""; }
-      var sPrefix = sKind === "po" ? "statusPo_" : sKind === "pq" ? "statusPq_" : "status_";
+      var sPrefix = sKind === "po" || sKind === "gr" ? "statusPo_" : sKind === "pq" ? "statusPq_" : "status_";
       var sKey = sPrefix + sStatus;
       return oBundle.hasText(sKey) ? oBundle.getText(sKey) : oBundle.getText("status_" + sStatus);
     },

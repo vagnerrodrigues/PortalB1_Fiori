@@ -1,0 +1,24 @@
+<mvc:View controllerName="portal.b1.modules.compras.controller.Receipts"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
+  <Page title="{i18n>recListTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh" />
+    </headerContent>
+    <subHeader>
+      <OverflowToolbar>
+        <SearchField liveChange=".onSearch" width="100%" placeholder="{i18n>recSearch}" />
+      </OverflowToolbar>
+    </subHeader>
+    <List id="list" items="{list>/}" noDataText="{i18n>recNone}" growing="true" growingThreshold="50">
+      <ObjectListItem title="{parts: [{value: 'po'}, 'list>source', 'list>docNum', 'list>entry'], formatter: '.formatter.kindTitle'}"
+        type="Navigation" press=".onOpen" number="{path: 'list>total', formatter: '.formatter.money'}">
+        <firstStatus>
+          <ObjectStatus text="{= ${list>late} ? ${i18n>recLate} : ${i18n>recOnTime} }" state="{= ${list>late} ? 'Error' : 'Success' }"
+            icon="{= ${list>late} ? 'sap-icon://alert' : 'sap-icon://shipping-status' }" />
+        </firstStatus>
+        <ObjectAttribute text="{list>cardCode} - {list>cardName}" />
+        <ObjectAttribute text="{i18n>dueDate}: {path: 'list>dueDate', formatter: '.formatter.date'} · {i18n>docDate}: {path: 'list>docDate', formatter: '.formatter.date'}" />
+      </ObjectListItem>
+    </List>
+  </Page>
+</mvc:View>

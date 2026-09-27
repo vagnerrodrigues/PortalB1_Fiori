@@ -15,7 +15,7 @@ const money = (v) => (v === null || v === undefined || v === '') ? '' :
 const date = (s) => (s ? String(s).slice(0, 10).split('-').reverse().join('/') : '');
 const clean = (s) => String(s || '').replace(/^\[DESPESA\]\s*/, '');
 
-const KIND_LABEL = { pr: ['Solicitação de compra', 'a', 'solicitacao'], pq: ['Oferta de compra', 'a', 'oferta'], po: ['Pedido de compra', 'o', 'pedido'] };
+const KIND_LABEL = { pr: ['Solicitação de compra', 'a', 'solicitacao'], pq: ['Oferta de compra', 'a', 'oferta'], po: ['Pedido de compra', 'o', 'pedido'], gr: ['Recebimento de mercadorias', 'o', 'recebimento'] };
 
 function label(doc) {
   const expense = doc.docType === 'service';

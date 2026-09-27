@@ -36,8 +36,15 @@ sap.ui.define([
         this._kind = o.kind; // rascunho: o tipo real vem do SAP
         o.attachmentBase = sBase + "/attachments";
         this.getModel("doc").setData(o);
+        var oCompras = (this.getModel("session").getProperty("/modules") || []).filter(function (m) { return m.id === "compras"; })[0];
+        this.getModel("view").setProperty("/canReceive", o.kind === "po" && o.source === "doc" && o.status === "OPEN" &&
+          !!(oCompras && oCompras.receiver) && this.getModel("view").getProperty("/mode") !== "approve");
         if (o.docType !== "service") { this.onLoadRelations(); }
       }.bind(this)).catch(function () {});
+    },
+
+    onReceive: function () {
+      this.getRouter().navTo("compras.receive", { entry: this._entry });
     },
 
     // ---------- Mapa de relações ----------

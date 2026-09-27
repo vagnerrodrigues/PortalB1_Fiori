@@ -40,9 +40,12 @@ const VENDORS = [
 ];
 
 const db = {
-  pr: [], pq: [], po: [], drafts: [], approvals: [], agreements: [],
-  seq: { pr: 100, pq: 300, po: 700, draft: 500, appr: 1, agr: 10 }
+  pr: [], pq: [], po: [], gr: [], drafts: [], approvals: [], agreements: [],
+  seq: { pr: 100, pq: 300, po: 700, gr: 900, draft: 500, appr: 1, agr: 10 }
 };
+// Controle de lote / série na demonstração
+const BATCH_ITEMS = ['ES-0010', 'MP-0001'];
+const SERIAL_ITEMS = ['TI-0500'];
 db.docs = db.pr; // compatibilidade com testes antigos
 
 const like = (s, t) => String(s).toLowerCase().includes(String(t || '').toLowerCase());
@@ -71,7 +74,8 @@ function line(i, l, service) {
     quantity: Number(l.quantity), openQty: Number(l.quantity), unitPrice, lineTotal: round2(unitPrice * Number(l.quantity)),
     requiredDate: l.requiredDate, shipDate: l.shipDate || null, costCenter: l.costCenter || '', warehouse: l.warehouse || '',
     vendor: l.vendor || '', freeText: l.freeText || '', agreementNo: l.agreementNo || null, agreementLine: l.agreementLine ?? null,
-    baseType: l.baseType || null, baseEntry: l.baseEntry || null, baseLine: l.baseLine ?? null, lineStatus: 'bost_Open'
+    baseType: l.baseType || null, baseEntry: l.baseEntry || null, baseLine: l.baseLine ?? null, lineStatus: 'bost_Open',
+    batch: l.batch || null, expiry: l.expiry || null
   };
 }
 
@@ -109,10 +113,10 @@ function materialize(kind, user, p) {
   // Cópia de base (oferta -> pedido): preço da oferta, baixa da linha de origem
   doc.lines.forEach((l) => {
     if (!l.baseEntry) return;
-    const src = db[l.baseType === 'pr' ? 'pr' : 'pq'].find((d) => d.entry === Number(l.baseEntry));
+    const src = db[l.baseType || 'pq'].find((d) => d.entry === Number(l.baseEntry));
     const sl = src && src.lines[Number(l.baseLine)];
     if (!sl) throw new SLError(400, -5002, `Linha base ${l.baseEntry}/${l.baseLine} não encontrada`);
-    Object.assign(l, { itemCode: sl.itemCode, itemName: sl.itemName, uom: sl.uom, unitPrice: sl.unitPrice, warehouse: sl.warehouse, costCenter: sl.costCenter });
+    Object.assign(l, { itemCode: sl.itemCode, itemName: sl.itemName, uom: sl.uom, unitPrice: sl.unitPrice, warehouse: l.warehouse || sl.warehouse, costCenter: sl.costCenter });
     l.quantity = l.quantity || sl.openQty;
     l.lineTotal = round2(l.unitPrice * l.quantity);
     l.shipDate = l.shipDate || sl.shipDate;
@@ -355,12 +359,36 @@ async function setAgreementStatus(_t, _c, no, status) {
 }
 
 // Mapa de relações: base (para trás) e cópias (para frente) a partir das linhas
+async function poForReceipt(_t, _c, entry) {
+  const d = db.po.find((x) => x.entry === Number(entry));
+  if (!d) throw new SLError(404, -2028, 'Pedido não encontrado');
+  return {
+    entry: d.entry, docNum: d.docNum, cardCode: d.cardCode, cardName: d.cardName, docDate: d.docDate, dueDate: d.dueDate,
+    branch: d.branch, status: d.status, numAtCard: d.numAtCard,
+    lines: d.lines.filter((l) => l.lineStatus === 'bost_Open' && l.openQty > 0).map((l) => ({
+      lineNum: l.lineNum, itemCode: l.itemCode, itemName: l.itemName, uom: l.uom, ordered: l.quantity, open: l.openQty,
+      unitPrice: l.unitPrice, warehouse: l.warehouse, shipDate: l.shipDate,
+      batch: BATCH_ITEMS.includes(l.itemCode), serial: SERIAL_ITEMS.includes(l.itemCode)
+    }))
+  };
+}
+
+async function createGoodsReceipt(_t, _c, user, p) {
+  const po = db.po.find((x) => x.entry === Number(p.poEntry));
+  if (!po) throw new SLError(404, -2028, 'Pedido não encontrado');
+  return materialize('gr', user, {
+    cardCode: p.cardCode, requiredDate: p.date, dueDate: p.date, numAtCard: p.numAtCard, comments: p.comments,
+    attachmentEntry: p.attachmentEntry, branch: p.branch,
+    lines: p.lines.map((l) => ({ baseType: 'po', baseEntry: po.entry, baseLine: l.lineNum, quantity: Number(l.quantity), warehouse: l.warehouse, batch: l.batch, expiry: l.expiry }))
+  });
+}
+
 async function docLinks(_t, _c, kind, entry) {
   const d = (db[kind] || []).find((x) => x.entry === Number(entry));
   if (!d) throw new SLError(404, -2028, 'Documento não encontrado');
   const links = new Map();
   d.lines.forEach((l) => { if (l.baseEntry) links.set(`up:${l.baseType}:${l.baseEntry}`, { dir: 'up', kind: l.baseType, entry: Number(l.baseEntry) }); });
-  ['pq', 'po'].forEach((k) => db[k].forEach((x) => x.lines.forEach((l) => {
+  ['pq', 'po', 'gr'].forEach((k) => db[k].forEach((x) => x.lines.forEach((l) => {
     if (l.baseType === kind && Number(l.baseEntry) === d.entry) links.set(`down:${k}:${x.entry}`, { dir: 'down', kind: k, entry: x.entry });
   })));
   return {
@@ -393,7 +421,7 @@ module.exports = {
   entryByDocNum: async (_t, _c, kind, docNum) => ((db[kind] || []).find((d) => d.docNum === Number(docNum)) || {}).entry || null,
   ordersForYear: async (_t, _c, year) => { seedHistory(); return db.po.filter((d) => String(d.docDate).startsWith(String(year)))
     .map((d) => ({ entry: d.entry, docNum: d.docNum, date: d.docDate, dueDate: d.dueDate, total: d.total, status: d.status, cardCode: d.cardCode, cardName: d.cardName })); },
-  docLinks, draftLinks,
+  docLinks, draftLinks, poForReceipt, createGoodsReceipt,
   countOpen: async (_t, _c, kind) => db[kind].filter((d) => d.status === 'OPEN').length,
   vendorContact, listDocs, openRequestLines, createQuotation, writeQuotationAnswer, closeDoc, cancelDoc, createPurchaseOrder,
   listAgreements, getAgreement, createAgreement, setAgreementStatus,

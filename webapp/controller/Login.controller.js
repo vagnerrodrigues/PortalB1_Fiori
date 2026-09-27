@@ -1,4 +1,4 @@
-sap.ui.define(["./BaseController", "sap/ui/model/json/JSONModel"], function (BaseController, JSONModel) {
+sap.ui.define(["./BaseController", "sap/ui/model/json/JSONModel", "sap/m/MessageBox"], function (BaseController, JSONModel, MessageBox) {
   "use strict";
   return BaseController.extend("portal.b1.controller.Login", {
     onInit: function () {
@@ -35,7 +35,10 @@ sap.ui.define(["./BaseController", "sap/ui/model/json/JSONModel"], function (Bas
         this.getModel("login").setProperty("/password", "");
         this.getOwnerComponent().setSession(oRes);
         this.getRouter().navTo("home", {}, true);
-      }.bind(this)).catch(function () {});
+      }.bind(this)).catch(function (oErr) {
+        // busy() não mostra 401 (sessão expirada); no login, 401 é senha/licença: precisa aparecer
+        if (oErr && oErr.status === 401) { MessageBox.error(oErr.message); }
+      });
     }
   });
 });

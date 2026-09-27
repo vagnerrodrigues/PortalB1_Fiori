@@ -51,7 +51,7 @@ const day = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
     const tApr = (await call('POST', '/api/m/ia/tokens', { password: '1234', scope: 'write' }, apr)).json.token;
     assert.ok(/^pb1_[0-9a-f]+_[0-9a-f]{12}_/.test(tReq));
     const saved = fs.readdirSync(path.join(process.env.DATA_DIR, 'ai-tokens', 'demo')).map((f) => fs.readFileSync(path.join(process.env.DATA_DIR, 'ai-tokens', 'demo', f), 'utf8')).join('');
-    assert.ok(!saved.includes(tReq.split('_').pop()) && !saved.includes('"1234"'));
+    assert.ok(!saved.includes(tReq.split('_').slice(3).join('_')) && !saved.includes('"1234"'));
     ok('token pessoal gerado com confirmação da senha do B1 (só hash do token e senha cifrada no disco)');
 
     // protocolo

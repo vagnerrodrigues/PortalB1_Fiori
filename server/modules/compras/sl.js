@@ -486,6 +486,7 @@ async function getRequest(tenant, ctx, source, entry, kind = 'pr') {
       freeText: l.FreeText,
       accountCode: l.AccountCode,
       agreementNo: l.AgreementNo || null,
+      openQty: l.RemainingOpenQuantity ?? null, // saldo a receber/copiar (lido do SAP, inclusive recebimentos feitos lá)
       baseType: l.BaseType ?? null,
       baseEntry: l.BaseEntry ?? null,
       lineStatus: l.LineStatus

@@ -39,8 +39,20 @@ sap.ui.define([
         var oCompras = (this.getModel("session").getProperty("/modules") || []).filter(function (m) { return m.id === "compras"; })[0];
         this.getModel("view").setProperty("/canReceive", o.kind === "po" && o.source === "doc" && o.status === "OPEN" &&
           !!(oCompras && oCompras.receiver) && this.getModel("view").getProperty("/mode") !== "approve");
+        this.getModel("view").setProperty("/receiptText", this._receiptText(o));
         if (o.docType !== "service") { this.onLoadRelations(); }
       }.bind(this)).catch(function () {});
+    },
+
+    /** Situação do recebimento do pedido, lida do SAP (inclui recebimentos lançados direto no SAP). */
+    _receiptText: function (o) {
+      if (o.kind !== "po" || o.source !== "doc") { return ""; }
+      var aL = (o.lines || []).filter(function (l) { return l.openQty !== null && l.openQty !== undefined; });
+      if (!aL.length) { return ""; }
+      var fOpen = aL.reduce(function (s, l) { return s + Number(l.openQty); }, 0);
+      var fQty = aL.reduce(function (s, l) { return s + Number(l.quantity); }, 0);
+      if (fOpen <= 0) { return this.text("recStTotal"); }
+      return fOpen < fQty ? this.text("recStPartial") : this.text("recStNone");
     },
 
     onReceive: function () {

@@ -14,6 +14,7 @@
         <ObjectAttribute title="{i18n>requiredDate}" text="{path: 'doc>/requiredDate', formatter: '.formatter.date'}" visible="{= ${doc>/kind} === 'pr' || ${doc>/kind} === 'pq' }" />
         <ObjectAttribute title="{= ${doc>/kind} === 'pq' ? ${i18n>validUntil} : ${i18n>dueDate} }" text="{path: 'doc>/dueDate', formatter: '.formatter.date'}" visible="{= ${doc>/kind} !== 'pr' &amp;&amp; !!${doc>/dueDate} }" />
         <ObjectAttribute title="{i18n>numAtCard}" text="{doc>/numAtCard}" visible="{= !!${doc>/numAtCard} }" />
+        <ObjectAttribute title="{i18n>recStatus}" text="{view>/receiptText}" visible="{= !!${view>/receiptText} }" />
         <ObjectAttribute title="{i18n>comments}" text="{path: 'doc>/comments', formatter: '.formatter.cleanComments'}" visible="{= !!${doc>/comments} }" />
       </ObjectHeader>
 
@@ -31,6 +32,8 @@
           <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true"><Text text="{= ${doc>/kind} === 'pr' ? ${i18n>unitPrice} : ${i18n>orderPrice} }" /></Column>
           <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true" visible="{= ${doc>/kind} !== 'pr' }"><Text text="{i18n>lineTotal}" /></Column>
           <Column minScreenWidth="Tablet" demandPopin="true" visible="{= ${doc>/kind} !== 'pr' }"><Text text="{i18n>shipDate}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true" visible="{= ${doc>/kind} === 'po' }"><Text text="{i18n>recReceived}" /></Column>
+          <Column hAlign="End" minScreenWidth="Tablet" demandPopin="true" visible="{= ${doc>/kind} === 'po' }"><Text text="{i18n>recOpen}" /></Column>
           <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>costCenter}" /></Column>
           <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} !== 'service' }"><Text text="{i18n>warehouse}" /></Column>
           <Column minScreenWidth="Desktop" demandPopin="true" visible="{= ${doc>/docType} !== 'service' &amp;&amp; ${doc>/kind} === 'pr' }"><Text text="{i18n>vendor}" /></Column>
@@ -45,6 +48,10 @@
             <ObjectNumber number="{path: 'doc>unitPrice', formatter: '.formatter.money'}" />
             <ObjectNumber number="{path: 'doc>lineTotal', formatter: '.formatter.money'}" />
             <Text text="{path: 'doc>shipDate', formatter: '.formatter.date'}" />
+            <ObjectNumber number="{= ${doc>openQty} === null || ${doc>openQty} === undefined ? '' : String(Math.round((${doc>quantity} - ${doc>openQty}) * 1000) / 1000) }" unit="{doc>uom}"
+              state="{= ${doc>openQty} === 0 ? 'Success' : 'None' }" />
+            <ObjectNumber number="{= ${doc>openQty} === null || ${doc>openQty} === undefined ? '' : String(${doc>openQty}) }" unit="{doc>uom}"
+              state="{= ${doc>openQty} > 0 ? 'Warning' : 'None' }" />
             <Text text="{doc>costCenter}" />
             <Text text="{doc>warehouse}" />
             <Text text="{doc>vendor}" />

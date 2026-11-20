@@ -29,6 +29,19 @@ sap.ui.define([
     onInit: function () {
       this.setModel(new JSONModel({}), "home");
       this.getRouter().getRoute("home").attachPatternMatched(this._render, this);
+      // Cards de indicadores clicáveis (mouse e teclado): abrem a lista correspondente
+      [["kpiSpend", "compras.orders"], ["kpiOpen", "compras.orders"], ["kpiSaving", "compras.rfqs"],
+        ["kpiContracts", "compras.contracts"], ["kpiVendors", "compras.orders"]].forEach(function (a) {
+        var oCard = this.byId(a[0]);
+        var go = function () { this.getRouter().navTo(a[1]); }.bind(this);
+        oCard.addStyleClass("pbClickable");
+        oCard.attachBrowserEvent("click", function (e) { if (!e.target.closest || !e.target.closest(".sapMLnk")) { go(); } });
+        oCard.attachBrowserEvent("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+        oCard.addEventDelegate({ onAfterRendering: function () {
+          var el = oCard.getDomRef();
+          if (el) { el.setAttribute("tabindex", "0"); el.setAttribute("role", "link"); }
+        } });
+      }, this);
     },
 
     _home: function () { return this.getModel("home"); },

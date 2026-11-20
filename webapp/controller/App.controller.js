@@ -39,6 +39,8 @@ sap.ui.define([
     "compras.new": "compras.new", "compras.approvals": "compras.approvals", "compras.offers": "compras.offers",
     "compras.contracts": "compras.contracts", "compras.contractNew": "compras.contracts", "compras.contract": "compras.contracts"
   };
+  // Rótulos curtos dos subitens de "Compras" (cabem no menu sem cortar)
+  var SHORT = { "new": "navSubNew", offers: "navSubOffers", contracts: "navSubContracts", approvals: "navSubApprovals" };
   var MODULE_KEY = { parceiros: "fornecedores", relatorios: "relatorios", despesas: "despesas", ia: "ia", admin: "config" };
 
   return BaseController.extend("portal.b1.controller.App", {
@@ -75,7 +77,7 @@ sap.ui.define([
           var g = aModules.filter(function (m) { return m.id === n.group; })[0];
           children = ((g && g.tiles) || []).filter(function (t) { return n.own.indexOf(t.id) < 0; }).map(function (t) {
             that._routes[t.route] = t.route;
-            return { key: t.route, text: t.title };
+            return { key: t.route, text: SHORT[t.id] ? that.text(SHORT[t.id]) : t.title };
           });
           if (!children.length) { return; }
         }
@@ -93,6 +95,10 @@ sap.ui.define([
       if (bLogin) { return; }
       var sKey = ROUTE_KEY[sName] || MODULE_KEY[sName.split(".")[0]];
       if (sKey) { this.getModel("shell").setProperty("/selectedKey", sKey); }
+      // Tela de um subitem (ex.: Contratos): abre o grupo "Compras" para o item selecionado aparecer
+      if (sKey && sKey.indexOf("compras.") === 0) {
+        this.byId("navList").getItems().forEach(function (it) { if (it.getKey() === "compras") { it.setExpanded(true); } });
+      }
     },
 
     onNavSelect: function (oEvent) {

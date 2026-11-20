@@ -25,14 +25,14 @@
 
         <!-- Indicadores (painel do comprador) -->
         <FlexBox class="pbKpis" visible="{home>/buyer}" busy="{home>/dash/busy}" busyIndicatorDelay="0" wrap="Wrap" alignItems="Stretch">
-          <VBox renderType="Bare" class="pbCard pbKpi">
+          <VBox id="kpiSpend" renderType="Bare" class="pbCard pbKpi">
             <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://cart" class="pbKpiIcon pbIcBlue" /><Text text="{home>/dash/spendTitle}" /></HBox>
             <Text text="{home>/dash/spend}" class="pbKpiValue" wrapping="false" tooltip="{home>/dash/spend}" />
             <Text text="{home>/dash/spendSub}" class="pbMuted pbSmall" />
             <ObjectStatus text="{home>/dash/spendDelta/text}" state="{home>/dash/spendDelta/state}" icon="{home>/dash/spendDelta/icon}" visible="{= !!${home>/dash/spendDelta/text} }" class="pbTrend" />
             <core:HTML content="{home>/dash/spark}" />
           </VBox>
-          <VBox renderType="Bare" class="pbCard pbKpi">
+          <VBox id="kpiOpen" renderType="Bare" class="pbCard pbKpi">
             <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://sales-order" class="pbKpiIcon pbIcViolet" /><Text text="{i18n>dashOpen}" /></HBox>
             <Text text="{home>/dash/open}" class="pbKpiValue" wrapping="false" />
             <Text text="{home>/dash/openSub}" class="pbMuted pbSmall" />
@@ -40,20 +40,20 @@
               icon="{= ${home>/dash/late} > 0 ? 'sap-icon://alert' : 'sap-icon://accept' }" class="pbTrend" />
             <core:HTML content="{home>/dash/lateBar}" />
           </VBox>
-          <VBox renderType="Bare" class="pbCard pbKpi">
+          <VBox id="kpiSaving" renderType="Bare" class="pbCard pbKpi">
             <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://lead" class="pbKpiIcon pbIcGreen" /><Text text="{i18n>dashSaving}" /></HBox>
             <Text text="{home>/dash/saving}" class="pbKpiValue" wrapping="false" />
             <Text text="{home>/dash/savingSub}" class="pbMuted pbSmall" />
             <Text text="{home>/dash/rfqText}" class="pbMuted pbSmall pbKpiFoot" />
           </VBox>
-          <VBox renderType="Bare" class="pbCard pbKpi" visible="{home>/dash/hasContracts}">
+          <VBox id="kpiContracts" renderType="Bare" class="pbCard pbKpi" visible="{home>/dash/hasContracts}">
             <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://appointment-2" class="pbKpiIcon pbIcOrange" /><Text text="{i18n>dashContracts}" /></HBox>
             <Text text="{home>/dash/contracts}" class="pbKpiValue" wrapping="false" />
             <Text text="{home>/dash/consumedText}" class="pbMuted pbSmall" />
             <core:HTML content="{home>/dash/consumedBar}" />
             <ObjectStatus text="{home>/dash/expiringText}" state="{= ${home>/dash/expiring} > 0 ? 'Warning' : 'None' }" icon="sap-icon://appointment-2" class="pbKpiFoot" />
           </VBox>
-          <VBox renderType="Bare" class="pbCard pbVendors">
+          <VBox id="kpiVendors" renderType="Bare" class="pbCard pbVendors">
             <HBox justifyContent="SpaceBetween" alignItems="Center" class="pbVendorsHead">
               <HBox alignItems="Center"><core:Icon src="sap-icon://horizontal-bar-chart" class="pbVendorsIcon" /><Title text="{i18n>dashTopVendors}" level="H2" /></HBox>
               <Link text="{i18n>homeSeeAll}" press=".onOrders" class="pbOnDarkLink" />

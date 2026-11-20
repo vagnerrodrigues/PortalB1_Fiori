@@ -166,6 +166,9 @@ sap.ui.define([
       if (d && d.agreements && d.agreements.expiring > 0) {
         add({ count: int(d.agreements.expiring), label: this.text("alertContracts"), icon: "sap-icon://appointment-2", state: "Warning", route: "compras.contracts" });
       }
+      if (c["beto.inbox"] > 0) {
+        add({ count: int(c["beto.inbox"]), label: this.text("alertBeto"), detail: this.text("alertBetoDetail"), icon: "sap-icon://lightbulb", state: "Information", route: "beto.inbox" });
+      }
       this.getModel("alerts").setData({ items: a, total: a.length, totalText: a.length ? this.text(a.length === 1 ? "alertsOne" : "alertsMany", [a.length]) : "" });
     },
 

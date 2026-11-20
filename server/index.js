@@ -27,7 +27,7 @@ const { wrap, requireAjax, requireAuth, errorHandler } = require('./core/http');
 const MOCK = process.env.MOCK === '1';
 
 // ---------- Módulos registrados ----------
-const registry = ['compras', 'despesas', 'parceiros', 'relatorios', 'ia', 'admin'].map((id) => require(`./modules/${id}`));
+const registry = ['compras', 'despesas', 'parceiros', 'relatorios', 'ia', 'beto', 'admin'].map((id) => require(`./modules/${id}`));
 
 // ---------- Empresas (multi-tenant) ----------
 function loadTenants() {
@@ -41,7 +41,8 @@ function loadTenants() {
       // aprovador é superusuário (vê tudo); Relatórios liberado para todos
       // comprador (depto 4) vê as telas de comprador de Compras (cotação, ofertas, pedidos, contratos)
       // almoxarife (depto 5) só vê Compras > Recebimento de mercadorias (+ solicitação e aprovações)
-      moduleAccess: { compras: { departments: [1, 2, 4, 5], buyers: { departments: [4] }, receivers: { departments: [5] } }, parceiros: { departments: [2, 3] } }
+      moduleAccess: { compras: { departments: [1, 2, 4, 5], buyers: { departments: [4] }, receivers: { departments: [5] } }, parceiros: { departments: [2, 3] },
+        beto: { departments: [2, 4], deciders: { departments: [4] } } } // Beto: comprador decide; aprovador (superusuário) administra
     }];
   }
   const file = process.env.TENANTS_FILE || path.join(__dirname, '..', 'config', 'tenants.json');
@@ -146,7 +147,7 @@ registry.forEach((mod) => {
     }
     next();
   };
-  app.use(`/api/m/${mod.id}`, authed, guard, mod.createRouter({ mock: MOCK, wrap, audit, tenantById }));
+  app.use(`/api/m/${mod.id}`, authed, guard, mod.createRouter({ mock: MOCK, wrap, audit, tenantById, tenants }));
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Rota não encontrada' }));

@@ -104,8 +104,8 @@ async function main() {
     ok('comercial vê Despesas + Parceiros + Relatórios; Compras bloqueado (403)');
 
     const meA = await call('GET', '/api/me', null, apr);
-    assert.strictEqual(meA.json.modules.length, 5);
-    ok('superusuário vê todos os módulos (inclui Configurações)');
+    assert.deepStrictEqual(meA.json.modules.map((m) => m.id), ['compras', 'despesas', 'parceiros', 'relatorios', 'beto', 'admin']);
+    ok('superusuário vê todos os módulos (inclui Beto e Configurações)');
 
     // ---------- Parceiros ----------
     const bps = await call('GET', '/api/m/parceiros?q=alfa', null, com);

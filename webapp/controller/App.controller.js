@@ -23,6 +23,7 @@ sap.ui.define([
     { key: "pedidos", textKey: "navOrders", icon: "sap-icon://sales-order", tile: "compras.orders" },
     { key: "recebimentos", textKey: "navReceipts", icon: "sap-icon://receipt", tile: "compras.receipts" },
     { key: "fornecedores", textKey: "navPartners", icon: "sap-icon://supplier", module: "parceiros" },
+    { key: "beto", textKey: "navBeto", icon: "sap-icon://lightbulb", module: "beto" },
     { key: "relatorios", textKey: "navReports", icon: "sap-icon://business-objects-experience", module: "relatorios" },
     { key: "despesas", textKey: "navExpenses", icon: "sap-icon://travel-expense", module: "despesas" },
     { key: "ia", textKey: "navAi", icon: "sap-icon://ai", module: "ia" },
@@ -41,7 +42,7 @@ sap.ui.define([
   };
   // Rótulos curtos dos subitens de "Compras" (cabem no menu sem cortar)
   var SHORT = { "new": "navSubNew", offers: "navSubOffers", contracts: "navSubContracts", approvals: "navSubApprovals" };
-  var MODULE_KEY = { parceiros: "fornecedores", relatorios: "relatorios", despesas: "despesas", ia: "ia", admin: "config" };
+  var MODULE_KEY = { beto: "beto", parceiros: "fornecedores", relatorios: "relatorios", despesas: "despesas", ia: "ia", admin: "config" };
 
   return BaseController.extend("portal.b1.controller.App", {
     onInit: function () {

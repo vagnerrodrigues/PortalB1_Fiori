@@ -1,0 +1,90 @@
+<mvc:View controllerName="portal.b1.modules.beto.controller.Inbox"
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core">
+  <Page title="{i18n>betoTitle}" showNavButton="true" navButtonPress=".onNavBack">
+    <headerContent>
+      <Button icon="sap-icon://refresh" tooltip="{i18n>refresh}" press=".onRefresh" />
+      <Button icon="sap-icon://media-play" text="{i18n>betoRunNow}" type="Emphasized" press=".onRun" visible="{beto>/roles/admin}" enabled="{= !${beto>/health/running} }" />
+    </headerContent>
+    <content>
+      <VBox class="sapUiSmallMargin">
+        <MessageStrip text="{i18n>betoStageInfo}" type="Information" showIcon="true" class="sapUiSmallMarginBottom" />
+        <FlexBox wrap="Wrap" class="pbBetoStats">
+          <VBox class="pbCard pbBetoStat"><Text text="{i18n>betoPending}" class="pbMuted pbSmall" /><Text text="{= String(${beto>/health/recommendations/PENDENTE} || 0) }" class="pbBetoNum" /></VBox>
+          <VBox class="pbCard pbBetoStat"><Text text="{i18n>betoAccepted}" class="pbMuted pbSmall" /><Text text="{= String(${beto>/health/recommendations/ACEITA} || 0) }" class="pbBetoNum" /></VBox>
+          <VBox class="pbCard pbBetoStat"><Text text="{i18n>betoLastRun}" class="pbMuted pbSmall" /><Text text="{beto>/lastRunText}" class="pbBetoMid" /></VBox>
+          <VBox class="pbCard pbBetoStat"><Text text="{i18n>betoAudit}" class="pbMuted pbSmall" />
+            <ObjectStatus text="{= ${beto>/health/audit/ok} ? ${i18n>betoAuditOk} : ${i18n>betoAuditBroken} }" state="{= ${beto>/health/audit/ok} ? 'Success' : 'Error' }"
+              icon="{= ${beto>/health/audit/ok} ? 'sap-icon://shield' : 'sap-icon://alert' }" /></VBox>
+        </FlexBox>
+
+        <IconTabBar expandable="false" class="sapUiResponsiveContentPadding pbBetoTabs" headerBackgroundDesign="Transparent">
+          <items>
+            <IconTabFilter text="{i18n>betoTabRecs}" count="{= String(${beto>/recs/length}) }" key="recs">
+              <SegmentedButton selectedKey="{beto>/status}" selectionChange=".onStatus" class="sapUiSmallMarginBottom">
+                <items>
+                  <SegmentedButtonItem key="PENDENTE" text="{i18n>betoPending}" />
+                  <SegmentedButtonItem key="ADIADA" text="{i18n>betoSnoozed}" />
+                  <SegmentedButtonItem key="" text="{i18n>all}" />
+                </items>
+              </SegmentedButton>
+              <List items="{beto>/recs}" noDataText="{i18n>betoNoRecs}" class="pbBetoList">
+                <CustomListItem type="Active" press=".onOpen">
+                  <HBox alignItems="Start" class="pbBetoRec">
+                    <core:Icon src="sap-icon://lightbulb" class="pbBetoRecIcon" />
+                    <VBox class="pbBetoRecText">
+                      <HBox alignItems="Center" wrap="Wrap" class="pbBetoRecHead">
+                        <ObjectStatus text="{beto>severityText}" state="{beto>severityState}" inverted="true" />
+                        <ObjectStatus text="{beto>statusText}" state="{beto>statusState}" />
+                        <Text text="{beto>impactText}" class="pbBetoImpact" visible="{= !!${beto>impactText} }" />
+                      </HBox>
+                      <Text text="{beto>title}" class="pbActionTitle" />
+                      <Text text="{beto>explanation}" class="pbMuted pbSmall" maxLines="2" />
+                      <Text text="{beto>meta}" class="pbMuted pbSmall" />
+                    </VBox>
+                    <core:Icon src="sap-icon://navigation-right-arrow" class="pbChevron" />
+                  </HBox>
+                </CustomListItem>
+              </List>
+            </IconTabFilter>
+            <IconTabFilter text="{i18n>betoTabRuns}" key="runs">
+              <Table items="{beto>/runs}" noDataText="{i18n>betoNoRuns}">
+                <columns>
+                  <Column><Text text="{i18n>betoColStart}" /></Column>
+                  <Column><Text text="{i18n>betoColTrigger}" /></Column>
+                  <Column><Text text="{i18n>betoColStatus}" /></Column>
+                  <Column hAlign="End"><Text text="{i18n>betoColFindings}" /></Column>
+                  <Column hAlign="End"><Text text="{i18n>betoColNew}" /></Column>
+                  <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>betoColSteps}" /></Column>
+                </columns>
+                <items>
+                  <ColumnListItem>
+                    <Text text="{beto>startedText}" />
+                    <Text text="{beto>trigger}{= ${beto>actor} ? ' · ' + ${beto>actor} : '' }" />
+                    <ObjectStatus text="{beto>status}" state="{= ${beto>status} === 'CONCLUIDO' ? 'Success' : ${beto>status} === 'EXECUTANDO' ? 'Information' : 'Error' }" />
+                    <Text text="{beto>findings}" />
+                    <Text text="{beto>newRecs}" />
+                    <Text text="{beto>stepsText}" />
+                  </ColumnListItem>
+                </items>
+              </Table>
+            </IconTabFilter>
+            <IconTabFilter text="{i18n>betoTabSkills}" key="skills">
+              <List items="{beto>/skills}" noDataText="{i18n>noData}">
+                <CustomListItem>
+                  <HBox alignItems="Center" justifyContent="SpaceBetween" class="pbBetoRec">
+                    <VBox class="pbBetoRecText">
+                      <Text text="{beto>name} · v{beto>version}" class="pbActionTitle" />
+                      <Text text="{beto>description}" class="pbMuted pbSmall" />
+                      <Text text="{beto>meta}" class="pbMuted pbSmall" />
+                    </VBox>
+                    <Switch state="{beto>enabled}" enabled="{beto>/roles/admin}" change=".onSkillToggle" customTextOn="Sim" customTextOff="Não" />
+                  </HBox>
+                </CustomListItem>
+              </List>
+            </IconTabFilter>
+          </items>
+        </IconTabBar>
+      </VBox>
+    </content>
+  </Page>
+</mvc:View>

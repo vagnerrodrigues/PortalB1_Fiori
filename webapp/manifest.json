@@ -205,6 +205,11 @@
           "target": "relatorios.run"
         },
         {
+          "name": "beto.inbox",
+          "pattern": "beto",
+          "target": "beto.inbox"
+        },
+        {
           "name": "ia.connect",
           "pattern": "assistente-ia",
           "target": "ia.connect"
@@ -350,6 +355,11 @@
           "id": "comprasReceive",
           "name": "modules.compras.view.Receive",
           "level": 3
+        },
+        "beto.inbox": {
+          "id": "betoInbox",
+          "name": "modules.beto.view.Inbox",
+          "level": 2
         }
       }
     }

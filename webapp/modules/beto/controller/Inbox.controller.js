@@ -23,30 +23,32 @@ sap.ui.define([
   var ST = { PENDENTE: ["Pendente", "Warning"], ACEITA: ["Aceita", "Success"], REJEITADA: ["Rejeitada", "None"], ADIADA: ["Adiada", "Information"],
     RESOLVIDA: ["Resolvida", "Success"], EXPIRADA: ["Expirada", "None"] };
   // Rótulos dos valores das evidências (as skills gravam em chaves técnicas)
-  var LABEL = { dueDate: ["Entrega", "date"], daysLate: ["Dias de atraso"], total: ["Total", "money"], price: ["Preço", "money"],
+  var LABEL = { dueDate: ["Entrega", "date"], daysLate: ["Dias de atraso"], total: ["Total", "money"], price: ["Preço", "money"], openValue: ["Em aberto", "money"],
+    openLines: ["Linhas abertas"], cardName: ["Fornecedor"],
     avgPrice: ["Preço médio", "money"], quantity: ["Quantidade"], openQty: ["Em aberto"], itemName: ["Item"] };
   var dt = function (s) { return s ? new Date(s).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "–"; };
 
   /** BETO — caixa de recomendações (etapa 1). O Beto recomenda; a pessoa decide; as telas do portal executam. */
   return BaseController.extend("portal.b1.modules.beto.controller.Inbox", {
     onInit: function () {
-      this.setModel(new JSONModel({ status: "PENDENTE", recs: [], runs: [], skills: [], roles: {}, health: {} }), "beto");
+      this.setModel(new JSONModel({ status: "PENDENTE", recs: [], runs: [], skills: [], roles: {}, health: {}, conn: { userName: "", password: "", tables: [] }, wh: [] }), "beto");
       this.getRouter().getRoute("beto.inbox").attachPatternMatched(this._load, this);
     },
 
     _m: function () { return this.getModel("beto"); },
 
-    _load: function () {
+    _load: function (bQuiet) {
       if (!this.routeOk()) { return; }
       var m = this._m();
       var st = m.getProperty("/status");
       var fmt = this.formatter;
-      this.busy(Promise.all([
+      var p = Promise.all([
         this.api.get("/api/m/beto/recommendations" + (st ? "?status=" + st : "")),
         this.api.get("/api/m/beto/health"),
         this.api.get("/api/m/beto/runs"),
         this.api.get("/api/m/beto/skills")
-      ])).then(function (a) {
+      ]);
+      (bQuiet ? p : this.busy(p)).then(function (a) {
         m.setProperty("/roles", a[0].roles);
         m.setProperty("/recs", a[0].items.map(function (r) {
           var sev = SEV[r.severity] || [r.severity, "None"];
@@ -58,6 +60,20 @@ sap.ui.define([
           });
         }));
         m.setProperty("/health", a[1]);
+        var conn = (a[1].sap && a[1].sap.connection) || {};
+        m.setProperty("/conn/userName", m.getProperty("/conn/userName") || conn.userName || "manager");
+        m.setProperty("/conn/configured", !!conn.configured);
+        m.setProperty("/conn/info", conn.configured ? "Usuário " + conn.userName + " · salvo por " + (conn.updatedBy || "?") + " em " + dt(conn.updatedAt) : "Não configurada");
+        m.setProperty("/conn/tables", ((conn.lastTest && conn.lastTest.tables) || []).map(function (x) {
+          return { tables: x.tables, how: x.sql ? "SQL (rápido)" : x.odata ? "OData (mais lento; libere no b1s_sqltable.conf)" : "Sem acesso", state: x.sql ? "Success" : x.odata ? "Warning" : "Error" };
+        }));
+        m.setProperty("/conn/testText", conn.lastTest ? (conn.lastTest.ok ? "Último teste OK em " : "Último teste FALHOU em ") + dt(conn.lastTest.at) + (conn.lastTest.error ? " · " + conn.lastTest.error : "") : "");
+        var NAMES = { po: "Pedidos de compra (linhas)", vendor: "Fornecedores", item: "Itens de compra" };
+        m.setProperty("/wh", ((a[1].sap && a[1].sap.warehouse) || []).map(function (w) {
+          return { name: NAMES[w.entity] || w.entity, total: w.total, rows: w.rows, mode: w.mode === "sql" ? "SQL" : w.mode === "odata" ? "OData" : w.mode === "demo" ? "Demonstração" : "–",
+            last: dt(w.lastRun), ms: w.ms, ok: w.ok, error: w.error || "", watermark: w.watermark ? fmt.date(w.watermark) : "–" };
+        }));
+        this._poll(a[1].running);
         m.setProperty("/lastRunText", a[1].lastRun ? dt(a[1].lastRun.endedAt || a[1].lastRun.startedAt) + " · " + a[1].lastRun.status : "Nunca executado");
         m.setProperty("/runs", a[2].map(function (r) {
           return Object.assign({}, r, { startedText: dt(r.startedAt), stepsText: r.steps.map(function (s) { return s.step + " (" + s.rows + ", " + s.ms + " ms" + (s.error ? ", " + s.error : "") + ")"; }).join(" · ") });
@@ -71,9 +87,35 @@ sap.ui.define([
     onRefresh: function () { this._load(); },
     onStatus: function () { this._load(); },
 
-    onRun: function () {
-      this.busy(this.api.post("/api/m/beto/runs", {})).then(function (r) {
-        MessageToast.show(r.status === "CONCLUIDO" ? r.findings + " achado(s), " + r.newRecs + " recomendação(ões) nova(s)" : "Execução com erros: " + r.errors.join("; "));
+    onRun: function () { this._start("/api/m/beto/runs"); },
+    onSync: function () { this._start("/api/m/beto/sync"); },
+
+    /** Execução/sincronização: no SAP real roda em segundo plano (202) e a tela acompanha. */
+    _start: function (url) {
+      this.busy(this.api.post(url, {})).then(function (r) {
+        if (r.status === "EXECUTANDO") { MessageToast.show("Em execução. A tela atualiza sozinha."); this._load(); return; }
+        MessageToast.show(r.status === "CONCLUIDO" ? (r.findings || 0) + " achado(s), " + (r.newRecs || 0) + " recomendação(ões) nova(s)" : "Concluído com avisos: " + (r.errors || []).join("; "));
+        this._load();
+      }.bind(this)).catch(function () {});
+    },
+
+    _poll: function (running) {
+      clearTimeout(this._timer);
+      if (running) { this._timer = setTimeout(this._load.bind(this, true), 5000); }
+    },
+
+    onSaveConn: function () {
+      var m = this._m();
+      this.busy(this.api.put("/api/m/beto/connection", { userName: m.getProperty("/conn/userName"), password: m.getProperty("/conn/password") })).then(function (c) {
+        m.setProperty("/conn/password", "");
+        MessageToast.show(c.test && c.test.ok ? "Conexão salva e testada" : "Conexão salva, mas há tabelas sem acesso");
+        this._load();
+      }.bind(this)).catch(function () {});
+    },
+
+    onTestConn: function () {
+      this.busy(this.api.post("/api/m/beto/connection/test", {})).then(function (t) {
+        MessageToast.show(t.ok ? "Conexão OK" : "Falhou: " + (t.error || "tabelas sem acesso"));
         this._load();
       }.bind(this)).catch(function () {});
     },
@@ -99,9 +141,10 @@ sap.ui.define([
       r.evidence.forEach(function (e) {
         var v = e.values || {};
         ev.addItem(new ColumnListItem({ cells: [
-          new Text({ text: (e.kind || "").toUpperCase() + " nº " + (e.docNum || e.docEntry) + (e.lineNum != null ? " / linha " + (e.lineNum + 1) : "") }),
+          new Text({ text: e.kind === "vendor" ? "Fornecedor" : e.kind === "item" ? "Item " + e.itemCode
+            : "Pedido nº " + (e.docNum || e.docEntry) + (e.lineNum != null ? " / linha " + (e.lineNum + 1) : "") + (e.itemCode ? " · " + e.itemCode : "") }),
           new Text({ text: [e.cardCode, v.cardName].filter(Boolean).join(" - ") }),
-          new Text({ text: Object.keys(v).filter(function (k) { return k !== "cardName"; }).map(function (k) {
+          new Text({ text: Object.keys(v).filter(function (k) { return k !== "cardName" && v[k] != null && v[k] !== ""; }).map(function (k) {
             var l = LABEL[k] || [k];
             var val = l[1] === "money" ? fmt.money(v[k]) : l[1] === "date" ? fmt.date(v[k]) : v[k];
             return l[0] + ": " + val;
@@ -157,6 +200,7 @@ sap.ui.define([
         MessageToast.show("Decisão registrada: " + (ST[out.status] || [out.status])[0]);
         // Aceitar: o Beto não executa nada; abre a tela existente para a pessoa agir
         if (out.action && out.action.route) { this.getRouter().navTo(out.action.route, out.action.params || {}); return; }
+        if (out.action && out.action.label) { MessageToast.show("Próximo passo: " + out.action.label); }
         this._load();
       }.bind(this)).catch(function () {});
     }

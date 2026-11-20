@@ -68,6 +68,47 @@
                 </items>
               </Table>
             </IconTabFilter>
+            <IconTabFilter text="{i18n>betoTabData}" key="data">
+              <VBox class="sapUiSmallMarginBottom" visible="{beto>/roles/admin}">
+                <Title text="{i18n>betoConnTitle}" level="H3" />
+                <Text text="{i18n>betoConnHelp}" class="pbMuted pbSmall sapUiTinyMarginBottom" />
+                <Text text="{beto>/conn/info}" class="pbSmall" />
+                <FlexBox wrap="Wrap" alignItems="End" class="pbBetoConn">
+                  <VBox><Label text="{i18n>user}" labelFor="betoUser" /><Input id="betoUser" value="{beto>/conn/userName}" width="14rem" /></VBox>
+                  <VBox><Label text="{i18n>password}" labelFor="betoPass" /><Input id="betoPass" type="Password" value="{beto>/conn/password}" width="14rem" placeholder="{= ${beto>/conn/configured} ? '(guardada; digite para trocar)' : '' }" /></VBox>
+                  <Button text="{i18n>betoConnSave}" type="Emphasized" press=".onSaveConn" enabled="{= !!${beto>/conn/password} }" />
+                  <Button text="{i18n>betoConnTest}" press=".onTestConn" enabled="{beto>/conn/configured}" />
+                </FlexBox>
+                <Text text="{beto>/conn/testText}" class="pbMuted pbSmall sapUiTinyMarginTop" />
+                <HBox wrap="Wrap" items="{beto>/conn/tables}" class="pbBetoConn">
+                  <ObjectStatus title="{beto>tables}" text="{beto>how}" state="{beto>state}" class="sapUiSmallMarginEnd" />
+                </HBox>
+              </VBox>
+              <HBox justifyContent="SpaceBetween" alignItems="Center" class="sapUiSmallMarginTop">
+                <Title text="{i18n>betoWhTitle}" level="H3" />
+                <Button text="{i18n>betoSyncNow}" icon="sap-icon://synchronize" press=".onSync" visible="{beto>/roles/admin}" enabled="{= !${beto>/health/running} }" />
+              </HBox>
+              <Table items="{beto>/wh}" noDataText="{i18n>betoWhEmpty}">
+                <columns>
+                  <Column><Text text="{i18n>betoColData}" /></Column>
+                  <Column hAlign="End"><Text text="{i18n>betoColTotal}" /></Column>
+                  <Column hAlign="End"><Text text="{i18n>betoColRead}" /></Column>
+                  <Column><Text text="{i18n>betoColMode}" /></Column>
+                  <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>betoColLast}" /></Column>
+                  <Column minScreenWidth="Tablet" demandPopin="true"><Text text="{i18n>betoColStatus}" /></Column>
+                </columns>
+                <items>
+                  <ColumnListItem>
+                    <Text text="{beto>name}" />
+                    <Text text="{beto>total}" />
+                    <Text text="{beto>rows}" />
+                    <Text text="{beto>mode}" />
+                    <Text text="{beto>last} · {beto>ms} ms · até {beto>watermark}" />
+                    <ObjectStatus text="{= ${beto>ok} ? 'OK' : ${beto>error} }" state="{= ${beto>ok} ? 'Success' : 'Error' }" />
+                  </ColumnListItem>
+                </items>
+              </Table>
+            </IconTabFilter>
             <IconTabFilter text="{i18n>betoTabSkills}" key="skills">
               <List items="{beto>/skills}" noDataText="{i18n>noData}">
                 <CustomListItem>

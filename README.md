@@ -75,12 +75,19 @@ O que fica no portal (`data/rfq/<empresa>/`) é só o convite, o token, o status
 
 **Publicação:** para o fornecedor abrir o link, publique na internet **apenas** a rota `/cotacao/*` e `/api/public/*` (com HTTPS) e preencha o **Endereço público** em Configurações. O resto do portal pode continuar só na rede interna.
 
-## Beto — inteligência de suprimentos (etapa 1: fundação)
+## Beto — inteligência de suprimentos (etapas 1–2)
 
 Módulo `beto` (`server/modules/beto`, tela *Beto* no menu). Arquitetura completa em `docs/BETO-ARCHITECTURE.md`.
 
 - **O Beto recomenda, a pessoa decide, o portal executa.** O Beto não escreve no SAP: aceitar uma recomendação só abre a tela existente (ex.: Pedidos de compra). Um teste automatizado falha se algum arquivo do Beto referenciar escrita no Service Layer.
-- **Etapa 1:** ainda não lê o SAP nem usa IA. Traz o repositório, a auditoria, as execuções, as recomendações com decisão humana e os perfis. Inclui uma skill de demonstração (`demo-late-po`), que só existe com `MOCK=1`.
+- **Leitura do SAP (etapa 2):** em *Beto › Dados do SAP*, o administrador cadastra o usuário de leitura (decisão D2: `manager`). A senha fica cifrada e nunca volta para a tela. *Testar conexão* mostra, por tabela, se a leitura é por SQL (rápido) ou por OData (mais lento).
+- **Espelho analítico:** cópia de leitura, incremental por `UpdateDate`, de pedidos de compra (OPOR/POR1), fornecedores (OCRD) e itens de compra (OITM). A carga inicial traz os pedidos abertos e os últimos 24 meses. Usa SQLQueries `PB_BETO_*`; se o SL recusar a tabela, cai para OData GET. Para acelerar, libere `OPOR`, `POR1`, `OCRD` e `OITM` no `b1s_sqltable.conf`.
+- **Skills:**
+  - **S1 `late-po-triage`:** pedidos atrasados por faixa (30/90/180 dias), com o valor em aberto.
+  - **S2 `fiscal-data-quality`:** linhas de pedido sem CFOP, fornecedores sem UF e itens de compra sem depósito padrão.
+  
+  As duas leem só o espelho. Ainda não há IA (decisão D4).
+- **Execução:** no SAP real, *Executar agora* e *Sincronizar agora* rodam em segundo plano (resposta 202) e a tela se atualiza sozinha.
 - **Repositório:** SQLite nativo do Node (`node:sqlite`, Node ≥ 22.13), um arquivo por empresa em `data/beto/<empresa>.db`. Inclua no backup.
 - **Auditoria:** tabela só de inserção (UPDATE/DELETE bloqueados) e encadeada por hash SHA-256. A integridade aparece na tela e em `GET /api/m/beto/health`.
 - **Habilitar (opt-in):** inclua `"beto"` em `tenants.json → modules`. Perfis:
@@ -89,7 +96,7 @@ Módulo `beto` (`server/modules/beto`, tela *Beto* no menu). Arquitetura complet
 ```
   Quem vê o módulo segue `departments`/`users`. **deciders** aceitam, rejeitam ou adiam (com motivo obrigatório para rejeitar/adiar). **admins** executam manualmente e configuram skills e agenda. O superusuário do B1 é sempre admin.
 - **Agenda:** desligada por padrão. Liga por empresa com `PUT /api/m/beto/schedule { enabled, time: "06:00" }`. `BETO_SCHEDULER=0` desliga o agendador no processo.
-- **API:** `/api/m/beto/` `health`, `me`, `counters`, `recommendations[/:id[/decision]]`, `runs`, `skills[/:id]`, `schedule`, `audit`.
+- **API:** `/api/m/beto/` `health`, `me`, `counters`, `recommendations[/:id[/decision]]`, `runs`, `skills[/:id]`, `schedule`, `audit`, `connection[/test]`, `warehouse`, `sync`.
 
 ## Assistente de IA (MCP)
 

@@ -6,6 +6,8 @@
  */
 const repoOf = require('./repo').forTenant;
 const skills = require('./skills');
+const warehouse = require('./warehouse');
+const connection = require('./connection');
 
 const SKILL_TIMEOUT_MS = Number(process.env.BETO_SKILL_TIMEOUT_MS || 120000);
 const REC_TTL_DAYS = Number(process.env.BETO_REC_TTL_DAYS || 14);
@@ -22,7 +24,7 @@ function skillsFor(tenant, mock) {
   });
 }
 
-async function run(tenant, { trigger = 'manual', actor = null, only = null, mock = false } = {}) {
+async function run(tenant, { trigger = 'manual', actor = null, only = null, mock = false, syncOnly = false, skipSync = false } = {}) {
   if (running.has(tenant.id)) { const e = new Error('Já existe uma execução do Beto em andamento para esta empresa'); e.status = 409; throw e; }
   running.add(tenant.id);
   const repo = repoOf(tenant.id);
@@ -32,11 +34,28 @@ async function run(tenant, { trigger = 'manual', actor = null, only = null, mock
   const errors = [];
   try {
     repo.housekeeping();
-    const list = skillsFor(tenant, mock).filter((s) => s.enabled && (!only || only.includes(s.id)));
+    const list = syncOnly ? [] : skillsFor(tenant, mock).filter((s) => s.enabled && (!only || only.includes(s.id)));
+    // 1) Espelho analítico: atualiza antes das skills que dependem dele (somente leitura no SAP)
+    let whReady = repo.listSync().some((s) => s.ok);
+    if (!skipSync && (syncOnly || list.some((s) => s.needsWarehouse))) {
+      try {
+        const res = await warehouse.syncAll(tenant, connection.connector(mock));
+        res.forEach((r) => repo.addStep(runId, `sync:${r.entity}`, { rows: r.rows, ms: r.ms, status: r.error ? 'ERRO' : 'OK', error: r.error ? r.error : (r.mode ? `modo ${r.mode}` : null) }));
+        res.filter((r) => r.error).forEach((r) => errors.push(`sync ${r.entity}: ${r.error}`));
+      } catch (e) {
+        repo.addStep(runId, 'sync', { status: 'ERRO', error: e.message });
+        errors.push(`sync: ${e.message}`);
+      }
+      whReady = repo.listSync().some((s) => s.ok);
+    }
     for (const skill of list) {
+      if (skill.needsWarehouse && !whReady) {
+        repo.addStep(runId, skill.id, { status: 'PULADO', error: 'espelho analítico ainda sem dados (configure a conexão e sincronize)' });
+        continue;
+      }
       const started = Date.now();
       try {
-        const out = await withTimeout(Promise.resolve(skill.detect({ tenant, params: skill.effectiveParams, today: new Date() })), SKILL_TIMEOUT_MS, skill.id);
+        const out = await withTimeout(Promise.resolve(skill.detect({ tenant, repo, params: skill.effectiveParams, today: new Date() })), SKILL_TIMEOUT_MS, skill.id);
         const seen = new Set();
         repo.tx(() => {
           for (const f of out || []) {
@@ -44,7 +63,7 @@ async function run(tenant, { trigger = 'manual', actor = null, only = null, mock
             seen.add(f.naturalKey);
             findings++;
             const cur = repo.openFinding(skill.id, f.naturalKey);
-            if (cur) { repo.touchFinding(cur.id, runId, f); continue; }
+            if (cur) { repo.touchFinding(cur.id, runId, f); repo.refreshFinding(cur.id, f, skill.describe(f)); continue; }
             const fid = repo.insertFinding(runId, skill, f);
             const d = skill.describe(f);
             repo.insertRecommendation(fid, skill, {

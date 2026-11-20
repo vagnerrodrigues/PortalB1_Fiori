@@ -1,7 +1,7 @@
 'use strict';
 /**
- * BETO — Blue Ocean Procurement Intelligence (etapa 1: fundação).
- * Módulo do portal em /api/m/beto. Somente leitura no SAP (nesta etapa, nem lê: usa só o próprio repositório).
+ * BETO — Blue Ocean Procurement Intelligence (etapas 1–2: fundação + espelho analítico).
+ * Módulo do portal em /api/m/beto. Somente leitura no SAP: copia pedidos, fornecedores e itens para o espelho local.
  * O Beto RECOMENDA; uma pessoa DECIDE; as telas existentes do portal EXECUTAM pelos fluxos e alçadas do B1.
  * Arquitetura: BETO-ARCHITECTURE.md (documentos do projeto).
  */
@@ -10,6 +10,7 @@ const repoOf = require('./repo').forTenant;
 const runner = require('./runner');
 const scheduler = require('./scheduler');
 const { rolesOf, canSee } = require('./roles');
+const connection = require('./connection');
 
 const STATUSES = ['PENDENTE', 'ACEITA', 'REJEITADA', 'ADIADA', 'RESOLVIDA', 'EXPIRADA'];
 const DECISIONS = ['ACEITA', 'REJEITADA', 'ADIADA'];
@@ -39,6 +40,10 @@ module.exports = {
     // Agenda: só empresas com o módulo Beto habilitado
     scheduler.start({ tenants, mock, isEnabled: (t) => module.exports.enabledWhen(t) });
 
+    const background = (tenant, opts) => {
+      if (runner.isRunning(tenant.id)) { const e = new Error('Já existe uma execução do Beto em andamento para esta empresa'); e.status = 409; throw e; }
+      runner.run(tenant, opts).catch((e) => console.error('[beto] execução falhou:', tenant.id, e.message));
+    };
     const roles = (req) => rolesOf(req.tenant, req.session.user);
     const need = (role) => (req, res, next) => (roles(req)[role] ? next() : res.status(403).json({ error: role === 'admin' ? 'Função exclusiva de administradores do Beto' : 'Seu perfil não pode decidir recomendações do Beto' }));
     const actorOf = (req) => req.session.user.userCode;
@@ -57,14 +62,14 @@ module.exports = {
       const repo = repoOf(req.tenant.id);
       const last = repo.listRuns(1)[0] || null;
       res.json({
-        stage: 1, mock,
+        stage: 2, mock,
         running: runner.isRunning(req.tenant.id),
         lastRun: last && { id: last.id, status: last.status, startedAt: last.startedAt, endedAt: last.endedAt, findings: last.findings, newRecs: last.newRecs },
         schedule: scheduler.scheduleOf(req.tenant.id),
         recommendations: repo.counts(),
         audit: repo.verifyAudit(),
         llm: { enabled: false, note: 'Camada de linguagem entra na etapa 4 (decisão D4)' },
-        sap: { access: 'nenhum nesta etapa', note: 'Espelho analítico somente leitura entra na etapa 2 (decisões D2/D3)' }
+        sap: { access: 'somente leitura', connection: connection.get(req.tenant.id), warehouse: repo.listSync() }
       });
     }));
 
@@ -109,8 +114,10 @@ module.exports = {
 
     r.post('/runs', need('admin'), wrap(async (req, res) => {
       const only = Array.isArray((req.body || {}).skills) ? req.body.skills.map(String).slice(0, 50) : null;
+      audit(req, 'BETO_RUN', { only });
+      // No SAP real a leitura pode levar minutos: roda em segundo plano e a tela acompanha pelo /health
+      if (!mock) { background(req.tenant, { trigger: 'manual', actor: actorOf(req), only, mock }); return res.status(202).json({ status: 'EXECUTANDO' }); }
       const out = await runner.run(req.tenant, { trigger: 'manual', actor: actorOf(req), only, mock });
-      audit(req, 'BETO_RUN', { run: out.id, status: out.status, newRecs: out.newRecs });
       res.status(201).json(out);
     }));
 
@@ -137,6 +144,36 @@ module.exports = {
       repoOf(req.tenant.id).setConfig('schedule', { enabled, time }, actorOf(req));
       audit(req, 'BETO_SCHEDULE', { enabled, time });
       res.json(scheduler.scheduleOf(req.tenant.id));
+    }));
+
+    // ---------- conexão com o SAP (leitura) e espelho analítico ----------
+    r.get('/connection', need('admin'), (req, res) => res.json(connection.get(req.tenant.id)));
+
+    r.put('/connection', need('admin'), wrap(async (req, res) => {
+      const { userName, password } = req.body || {};
+      if (!String(userName || '').trim() || !password) return res.status(400).json({ error: 'Informe usuário e senha do SAP B1' });
+      if (String(userName).length > 50 || String(password).length > 200) return res.status(400).json({ error: 'Usuário ou senha longos demais' });
+      const test = await connection.test(req.tenant, { mock, userName: String(userName).trim(), password: String(password) });
+      if (!test.ok && /Login|inválid/i.test(String(test.error))) return res.status(400).json({ error: test.error, test });
+      connection.save(req.tenant.id, { userName, password }, actorOf(req));
+      connection.setLastTest(req.tenant.id, test);
+      audit(req, 'BETO_CONNECTION', { userName: String(userName).trim(), ok: test.ok });
+      res.json({ ...connection.get(req.tenant.id), test });
+    }));
+
+    r.post('/connection/test', need('admin'), wrap(async (req, res) => {
+      const test = await connection.test(req.tenant, { mock });
+      connection.setLastTest(req.tenant.id, test);
+      res.json(test);
+    }));
+
+    r.get('/warehouse', wrap(async (req, res) => res.json({ entities: repoOf(req.tenant.id).listSync() })));
+
+    r.post('/sync', need('admin'), wrap(async (req, res) => {
+      audit(req, 'BETO_SYNC', {});
+      if (!mock) { background(req.tenant, { trigger: 'sincronizacao', actor: actorOf(req), mock, syncOnly: true }); return res.status(202).json({ status: 'EXECUTANDO' }); }
+      const out = await runner.run(req.tenant, { trigger: 'sincronizacao', actor: actorOf(req), mock, syncOnly: true });
+      res.status(201).json({ ...out, entities: repoOf(req.tenant.id).listSync() });
     }));
 
     r.get('/audit', need('admin'), wrap(async (req, res) => {

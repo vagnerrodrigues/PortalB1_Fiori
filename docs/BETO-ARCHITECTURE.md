@@ -5,7 +5,7 @@
 |---|---|
 | Base auditada | `vagnerrodrigues/PortalB1_Fiori`, branch `main`, commit `e4bf6e9` (20/11/2026) |
 | Ambiente de referência | Servidor Windows do cliente (SILCON TESTES), Node 22, SAP B1 10.0 HANA, Service Layer `IT506788-HANA01:50000` |
-| Status | **Validado em 20/11/2026.** Etapa 1 (fundação) implementada. Próxima: etapa 2 (espelho analítico), que depende da D2 e dos pré-requisitos da etapa 0. |
+| Status | **Validado em 20/11/2026.** Etapas 1 (fundação) e 2 (espelho analítico + S1/S2) implementadas. Próxima: etapa 3 (S3 pontualidade, S4 variação de preço). |
 
 ---
 
@@ -588,8 +588,12 @@ O documento foi validado com "vamos seguir". As recomendações abaixo foram apl
 | D7 | Público por perfil (`audience`: comprador, recebedor, gestor, todos) | `server/modules/beto/roles.js` |
 | D8 | Decisão só pelo portal (nada no MCP) | `POST /recommendations/:id/decision` |
 | D11 | Saneamento primeiro (S1/S2 antes de S4/S7) | Ordem das etapas 3 e 5 |
+| D2 | Leitura com o usuário **`manager`** (o mesmo já usado no portal), senha cifrada e só cadastrada pelo administrador do Beto. Apesar de ser superusuário, o Beto só lê: só `warehouse.js`/`connection.js` acessam o SL, com GET e SQLQueries, e o teste automatizado garante isso | `server/modules/beto/connection.js`, tela Beto › Dados do SAP |
+| D3 | Espelho incremental local (SQLQueries `PB_BETO_*`, com fallback para OData GET quando a tabela não está liberada) | `server/modules/beto/warehouse.js` |
 
-**Seguem em aberto:** D2 (identidade de leitura e licença), D3 na prática (depende da D2), D5, D9, D10 e D12.
+**Seguem em aberto:** D5, D9, D10 e D12.
+
+**Risco aceito na D2:** se a senha do `manager` mudar no SAP, a sincronização para até alguém atualizar a senha na tela do Beto.
 
 ## 14. Riscos conhecidos
 

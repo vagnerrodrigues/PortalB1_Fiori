@@ -1,0 +1,13 @@
+{
+  "id": "fiscal-data-quality",
+  "name": "Qualidade dos dados fiscais e cadastrais",
+  "version": "1.0.0",
+  "category": "saneamento",
+  "financialImpact": false,
+  "audience": "comprador",
+  "defaultEnabled": true,
+  "needsWarehouse": true,
+  "description": "Linhas de pedidos em aberto sem CFOP (o recebimento é barrado), fornecedores ativos sem UF (o portal não decide CFOP dentro/fora do estado) e itens de compra sem depósito padrão.",
+  "params": { "checkCfop": true, "checkVendorState": true, "checkItemWarehouse": true },
+  "reads": ["wh_po", "wh_po_line", "wh_vendor", "wh_item"]
+}

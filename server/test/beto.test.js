@@ -1,5 +1,5 @@
 'use strict';
-/** BETO etapa 1: fundação (repositório, auditoria, execução, recomendações, perfis, isolamento, sem escrita no SAP). */
+/** BETO etapas 1-2: fundação + espelho analítico (conexão, sincronização, S1/S2, perfis, auditoria, isolamento, sem escrita no SAP). */
 process.env.MOCK = '1';
 const fs = require('fs');
 const os = require('os');
@@ -29,13 +29,19 @@ async function main() {
     const files = [];
     const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).forEach((e) => (e.isDirectory() ? walk(path.join(d, e.name)) : e.name.endsWith('.js') && files.push(path.join(d, e.name))));
     walk(dir);
-    const FORBIDDEN = /slClient|sl-procure|['"]\.\/sl['"]|\/compras\/sl['"]|createDocument|finalizeDraft|createGoodsReceipt|createPurchase|\.decide\(\s*tenant|['"](PATCH|DELETE)['"]/;
+    // Só warehouse.js e connection.js falam com o SL; neles, só GET (sl.request/getAll), login/logout e SQLQueries via core/sqlQuery
+    const SL_FILES = ['warehouse.js', 'connection.js'];
+    const FORBIDDEN = /sl-procure|['"]\.\/sl['"]|\/compras\/sl['"]|\/compras\/index|createDocument|finalizeDraft|createGoodsReceipt|createPurchase|\.decide\(\s*tenant|['"](PATCH|DELETE|PUT)['"]/;
     files.forEach((f) => {
+      const rel = path.relative(dir, f);
       const src = fs.readFileSync(f, 'utf8');
-      assert.ok(!FORBIDDEN.test(src), `${path.relative(dir, f)} referencia escrita no SAP`);
-      if (/compras\/mock/.test(src)) assert.ok(require(path.join(path.dirname(f), 'manifest.json')).mockOnly, `${path.relative(dir, f)} usa dados demo sem mockOnly`);
+      assert.ok(!FORBIDDEN.test(src), `${rel} referencia escrita no SAP`);
+      if (/slClient/.test(src)) assert.ok(SL_FILES.includes(rel), `${rel} não pode falar com o Service Layer`);
+      (src.match(/sl\.request\([^)]*\)/g) || []).forEach((c) => assert.ok(/'GET'/.test(c), `${rel}: chamada ao SL que não é GET: ${c}`));
+      assert.ok(!/sl\.requestRaw/.test(src), `${rel}: requestRaw não permitido`);
+      if (/compras\/mock/.test(src)) assert.ok(rel === 'mocksource.js', `${rel} usa dados de demonstração fora do mocksource`);
     });
-    ok(`nenhum arquivo do Beto referencia escrita no SAP (${files.length} arquivos verificados)`);
+    ok(`nenhum arquivo do Beto escreve no SAP; só warehouse/connection leem (GET/SQLQueries) (${files.length} arquivos verificados)`);
 
     // ---------- acesso por perfil ----------
     const req = await login('requisitante');
@@ -47,12 +53,31 @@ async function main() {
     assert.ok((await call('GET', '/api/m/beto/me', null, boss)).json.roles.admin);
     ok('módulo só para quem tem acesso; comprador decide, superusuário administra');
 
+    // ---------- conexão (D2) ----------
+    assert.strictEqual((await call('GET', '/api/m/beto/connection', null, buyer)).status, 403);
+    assert.strictEqual((await call('PUT', '/api/m/beto/connection', { userName: 'aprovador', password: 'errada' }, boss)).status, 400);
+    const conn = await call('PUT', '/api/m/beto/connection', { userName: 'aprovador', password: '1234' }, boss);
+    assert.strictEqual(conn.status, 200, JSON.stringify(conn.json));
+    assert.ok(conn.json.configured && conn.json.test.ok && !JSON.stringify(conn.json).includes('1234'));
+    const rawCfg = repoMod.forTenant('demo').getConfig('connection');
+    assert.ok(rawCfg.passwordEnc && !rawCfg.passwordEnc.includes('1234'));
+    const audConn = repoMod.forTenant('demo').listAudit({ refId: 'connection' })[0];
+    assert.strictEqual(audConn.payload.password, '***');
+    ok('conexão do Beto: senha validada, cifrada, nunca devolvida nem auditada');
+
+    // ---------- espelho analítico ----------
+    const sync = await call('POST', '/api/m/beto/sync', {}, boss);
+    assert.strictEqual(sync.status, 201, JSON.stringify(sync.json));
+    const ents = Object.fromEntries(sync.json.entities.map((e) => [e.entity, e]));
+    assert.ok(ents.po.ok && ents.po.total > 0 && ents.vendor.ok && ents.item.ok);
+    ok(`espelho sincronizado: ${ents.po.total} linhas de pedido, ${ents.vendor.total} fornecedores, ${ents.item.total} itens`);
+
     // ---------- execução manual ----------
     assert.strictEqual((await call('POST', '/api/m/beto/runs', {}, buyer)).status, 403);
     const run1 = await call('POST', '/api/m/beto/runs', {}, boss);
     assert.strictEqual(run1.status, 201, JSON.stringify(run1.json));
-    assert.strictEqual(run1.json.status, 'CONCLUIDO');
-    assert.ok(run1.json.newRecs >= 1, 'demo deve gerar ao menos uma recomendação');
+    assert.strictEqual(run1.json.status, 'CONCLUIDO', JSON.stringify(run1.json));
+    assert.ok(run1.json.newRecs >= 2, 'S1 e S2 devem gerar recomendações nos dados de demonstração');
     ok(`execução manual: ${run1.json.findings} achado(s), ${run1.json.newRecs} recomendação(ões)`);
 
     const run2 = (await call('POST', '/api/m/beto/runs', {}, boss)).json;
@@ -61,8 +86,13 @@ async function main() {
 
     // ---------- recomendações ----------
     const list = (await call('GET', '/api/m/beto/recommendations?status=PENDENTE', null, buyer)).json.items;
-    assert.ok(list.length >= 1 && list.every((x) => x.status === 'PENDENTE' && x.financial && x.audience === 'comprador'));
-    const rec = list[0];
+    assert.ok(list.length >= 1 && list.every((x) => x.status === 'PENDENTE' && x.audience === 'comprador'));
+    assert.ok(list.some((x) => x.skill === 'late-po-triage' && x.financial && x.impactBRL > 0));
+    const cfop = list.find((x) => x.skill === 'fiscal-data-quality' && /CFOP/.test(x.title));
+    assert.ok(cfop && !cfop.financial && cfop.severity === 'alta');
+    assert.ok(list.some((x) => /UF/.test(x.title)) && list.some((x) => /depósito/.test(x.title)));
+    ok('S1 (pedidos atrasados, com valor em aberto) e S2 (sem CFOP, fornecedor sem UF, item sem depósito) a partir do espelho');
+    const rec = list.find((x) => x.skill === 'late-po-triage');
     const det = (await call('GET', `/api/m/beto/recommendations/${rec.id}`, null, buyer)).json;
     assert.ok(det.evidence.length >= 1 && det.evidence.every((e) => e.kind === 'po' && e.docEntry));
     assert.ok(det.finding && det.finding.skillVersion);
@@ -77,7 +107,8 @@ async function main() {
     assert.strictEqual((await call('POST', `/api/m/beto/recommendations/${rec.id}/decision`, { decision: 'ACEITA' }, buyer)).status, 409);
     ok('decisão humana: motivo obrigatório para rejeitar/adiar; aceitar devolve só o atalho (o Beto não executa); sem decisão dupla');
 
-    if (list[1]) {
+    if (list.find((x) => x.id !== rec.id)) {
+      list[1] = list.find((x) => x.id !== rec.id);
       const fut = new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10);
       const ad = await call('POST', `/api/m/beto/recommendations/${list[1].id}/decision`, { decision: 'ADIADA', reason: 'revisar no fechamento', snoozeUntil: fut }, buyer);
       assert.strictEqual(ad.json.status, 'ADIADA');
@@ -100,9 +131,9 @@ async function main() {
 
     // ---------- skills e agenda ----------
     const sk = (await call('GET', '/api/m/beto/skills', null, buyer)).json;
-    assert.ok(sk.some((s) => s.id === 'demo-late-po' && s.mockOnly));
-    assert.strictEqual((await call('PUT', '/api/m/beto/skills/demo-late-po', { enabled: true, params: { foo: 1 } }, boss)).status, 400);
-    assert.strictEqual((await call('PUT', '/api/m/beto/skills/demo-late-po', { enabled: false, params: { bands: [60] } }, boss)).json.enabled, false);
+    assert.ok(sk.some((s) => s.id === 'late-po-triage') && sk.some((s) => s.id === 'fiscal-data-quality'));
+    assert.strictEqual((await call('PUT', '/api/m/beto/skills/late-po-triage', { enabled: true, params: { foo: 1 } }, boss)).status, 400);
+    assert.strictEqual((await call('PUT', '/api/m/beto/skills/late-po-triage', { enabled: false, params: { bands: [60] } }, boss)).json.enabled, false);
     assert.strictEqual((await call('PUT', '/api/m/beto/schedule', { enabled: true, time: '25:00' }, boss)).status, 400);
     assert.strictEqual((await call('PUT', '/api/m/beto/schedule', { enabled: true, time: '06:30' }, boss)).json.time, '06:30');
     const sched = require('../modules/beto/scheduler');
@@ -123,11 +154,12 @@ async function main() {
     ok('isolamento: arquivo e dados separados por empresa');
 
     const health = (await call('GET', '/api/m/beto/health', null, buyer)).json;
-    assert.strictEqual(health.stage, 1);
+    assert.strictEqual(health.stage, 2);
+    assert.ok(health.sap.connection.configured && health.sap.warehouse.length === 3);
     assert.strictEqual(health.llm.enabled, false);
     ok('health: etapa, última execução, agenda, contagens, integridade da auditoria');
 
-    console.log('\nBETO etapa 1: OK');
+    console.log('\nBETO etapas 1-2: OK');
   } catch (e) {
     console.error('FALHOU:', e);
     process.exitCode = 1;

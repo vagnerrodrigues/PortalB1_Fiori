@@ -63,7 +63,24 @@ const MIGRATIONS = [
      seq INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, at TEXT NOT NULL, actor TEXT, action TEXT NOT NULL,
      ref_type TEXT, ref_id TEXT, payload TEXT, prev_hash TEXT NOT NULL, hash TEXT NOT NULL);
    CREATE TRIGGER audit_no_update BEFORE UPDATE ON audit_event BEGIN SELECT RAISE(ABORT, 'auditoria é somente inserção'); END;
-   CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_event BEGIN SELECT RAISE(ABORT, 'auditoria é somente inserção'); END;`
+   CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_event BEGIN SELECT RAISE(ABORT, 'auditoria é somente inserção'); END;`,
+  // v2 — espelho analítico (etapa 2): cópia de leitura, só os campos que as skills usam
+  `CREATE TABLE wh_po (
+     tenant_id TEXT NOT NULL, doc_entry INTEGER NOT NULL, doc_num INTEGER, card_code TEXT, card_name TEXT, doc_date TEXT, due_date TEXT,
+     status TEXT, canceled INTEGER DEFAULT 0, bpl_id INTEGER, update_date TEXT, PRIMARY KEY (tenant_id, doc_entry));
+   CREATE TABLE wh_po_line (
+     tenant_id TEXT NOT NULL, doc_entry INTEGER NOT NULL, line_num INTEGER NOT NULL, item_code TEXT, item_name TEXT, quantity REAL, open_qty REAL,
+     price REAL, line_total REAL, ship_date TEXT, line_status TEXT, cfop TEXT, usage TEXT, base_type INTEGER, base_entry INTEGER, agreement_no INTEGER,
+     PRIMARY KEY (tenant_id, doc_entry, line_num));
+   CREATE INDEX wh_po_open ON wh_po(tenant_id, status, due_date);
+   CREATE TABLE wh_vendor (
+     tenant_id TEXT NOT NULL, card_code TEXT NOT NULL, card_name TEXT, active INTEGER, email TEXT, state TEXT, update_date TEXT, PRIMARY KEY (tenant_id, card_code));
+   CREATE TABLE wh_item (
+     tenant_id TEXT NOT NULL, item_code TEXT NOT NULL, item_name TEXT, purchase INTEGER, active INTEGER, default_wh TEXT, group_code INTEGER, update_date TEXT,
+     PRIMARY KEY (tenant_id, item_code));
+   CREATE TABLE wh_sync (
+     tenant_id TEXT NOT NULL, entity TEXT NOT NULL, watermark TEXT, last_run TEXT, rows INTEGER, total INTEGER, mode TEXT, ok INTEGER, error TEXT, ms INTEGER,
+     PRIMARY KEY (tenant_id, entity));`
 ];
 
 const GENESIS = '0'.repeat(64);
@@ -126,10 +143,11 @@ class Repo {
     return r ? pj(r.value) : dflt;
   }
 
-  setConfig(key, value, actor) {
+  /** auditValue: o que vai para a auditoria (ex.: sem senha). Padrão: o próprio valor. */
+  setConfig(key, value, actor, auditValue) {
     this.db.prepare('INSERT INTO config (tenant_id, key, value) VALUES (?,?,?) ON CONFLICT(tenant_id, key) DO UPDATE SET value = excluded.value')
       .run(this.tenantId, key, j(value));
-    this.audit(actor, 'CONFIG_SET', 'config', key, value);
+    this.audit(actor, 'CONFIG_SET', 'config', key, auditValue === undefined ? value : auditValue);
   }
 
   skillConfig(skillId) {
@@ -197,6 +215,21 @@ class Repo {
   touchFinding(id, runId, f) {
     this.db.prepare('UPDATE finding SET last_seen = ?, run_id = ?, severity = ?, metric_value = ?, impact_brl = ?, data = ? WHERE id = ? AND tenant_id = ?')
       .run(now(), runId, f.severity, f.metricValue ?? null, f.impactBRL ?? null, j(f.data), id, this.tenantId);
+  }
+
+  /** Achado que continua aberto mas mudou (ex.: mais pedidos na faixa): troca as evidências e atualiza o texto da recomendação ainda não decidida. */
+  refreshFinding(id, f, d) {
+    this.db.prepare('DELETE FROM evidence WHERE tenant_id = ? AND finding_id = ?').run(this.tenantId, id);
+    const ins = this.db.prepare('INSERT INTO evidence (id, tenant_id, finding_id, kind, doc_entry, doc_num, line_num, card_code, item_code, snapshot) VALUES (?,?,?,?,?,?,?,?,?,?)');
+    (f.evidence || []).forEach((e) => ins.run(newId('evd'), this.tenantId, id, e.kind || null, e.docEntry ?? null, e.docNum ?? null, e.lineNum ?? null,
+      e.cardCode || null, e.itemCode || null, j(e.values)));
+    const recs = this.db.prepare("SELECT id, title FROM recommendation WHERE tenant_id = ? AND finding_id = ? AND status IN ('PENDENTE','ADIADA')").all(this.tenantId, id);
+    recs.forEach((r) => {
+      if (r.title === d.title) return;
+      this.db.prepare('UPDATE recommendation SET title = ?, explanation = ?, impact_brl = ?, severity = ?, updated_at = ? WHERE id = ? AND tenant_id = ?')
+        .run(d.title, d.explanation || null, f.impactBRL ?? null, f.severity, now(), r.id, this.tenantId);
+      this.audit(null, 'REC_UPDATED', 'recommendation', r.id, { from: r.title, to: d.title });
+    });
   }
 
   resolveFinding(id) {
@@ -287,6 +320,63 @@ class Repo {
   counts() {
     const rows = this.db.prepare('SELECT status, COUNT(*) n FROM recommendation WHERE tenant_id = ? GROUP BY status').all(this.tenantId);
     return Object.fromEntries(rows.map((r) => [r.status, r.n]));
+  }
+
+  // ---------- espelho analítico ----------
+  syncState(entity) {
+    const r = this.db.prepare('SELECT * FROM wh_sync WHERE tenant_id = ? AND entity = ?').get(this.tenantId, entity);
+    return r ? { entity, watermark: r.watermark, lastRun: r.last_run, rows: r.rows, total: r.total, mode: r.mode, ok: !!r.ok, error: r.error, ms: r.ms } : null;
+  }
+
+  setSyncState(entity, s) {
+    this.db.prepare(`INSERT INTO wh_sync (tenant_id, entity, watermark, last_run, rows, total, mode, ok, error, ms) VALUES (?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(tenant_id, entity) DO UPDATE SET watermark = excluded.watermark, last_run = excluded.last_run, rows = excluded.rows, total = excluded.total,
+      mode = excluded.mode, ok = excluded.ok, error = excluded.error, ms = excluded.ms`)
+      .run(this.tenantId, entity, s.watermark ?? null, now(), s.rows ?? 0, s.total ?? 0, s.mode ?? null, s.ok ? 1 : 0, s.error ?? null, s.ms ?? 0);
+  }
+
+  listSync() {
+    return this.db.prepare('SELECT entity FROM wh_sync WHERE tenant_id = ? ORDER BY entity').all(this.tenantId).map((r) => this.syncState(r.entity));
+  }
+
+  /** Substitui pedidos inteiros (cabeçalho + linhas) vindos de uma leitura. */
+  upsertOrders(docs) {
+    const t = this.tenantId;
+    const head = this.db.prepare(`INSERT INTO wh_po (tenant_id, doc_entry, doc_num, card_code, card_name, doc_date, due_date, status, canceled, bpl_id, update_date)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(tenant_id, doc_entry) DO UPDATE SET doc_num = excluded.doc_num, card_code = excluded.card_code,
+      card_name = excluded.card_name, doc_date = excluded.doc_date, due_date = excluded.due_date, status = excluded.status, canceled = excluded.canceled,
+      bpl_id = excluded.bpl_id, update_date = excluded.update_date`);
+    const del = this.db.prepare('DELETE FROM wh_po_line WHERE tenant_id = ? AND doc_entry = ?');
+    const line = this.db.prepare(`INSERT INTO wh_po_line (tenant_id, doc_entry, line_num, item_code, item_name, quantity, open_qty, price, line_total, ship_date,
+      line_status, cfop, usage, base_type, base_entry, agreement_no) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    this.tx(() => docs.forEach((d) => {
+      head.run(t, d.docEntry, d.docNum ?? null, d.cardCode ?? null, d.cardName ?? null, d.docDate ?? null, d.dueDate ?? null, d.status ?? null,
+        d.canceled ? 1 : 0, d.bplId ?? null, d.updateDate ?? null);
+      del.run(t, d.docEntry);
+      (d.lines || []).forEach((l) => line.run(t, d.docEntry, l.lineNum, l.itemCode ?? null, l.itemName ?? null, l.quantity ?? null, l.openQty ?? null,
+        l.price ?? null, l.lineTotal ?? null, l.shipDate ?? null, l.lineStatus ?? null, l.cfop || null, l.usage == null || l.usage === '' ? null : String(l.usage),
+        l.baseType ?? null, l.baseEntry ?? null, l.agreementNo ?? null));
+    }));
+  }
+
+  upsertVendors(rows) {
+    const st = this.db.prepare(`INSERT INTO wh_vendor (tenant_id, card_code, card_name, active, email, state, update_date) VALUES (?,?,?,?,?,?,?)
+      ON CONFLICT(tenant_id, card_code) DO UPDATE SET card_name = excluded.card_name, active = excluded.active, email = excluded.email,
+      state = excluded.state, update_date = excluded.update_date`);
+    this.tx(() => rows.forEach((v) => st.run(this.tenantId, v.cardCode, v.cardName ?? null, v.active ? 1 : 0, v.email || null, v.state || null, v.updateDate ?? null)));
+  }
+
+  upsertItems(rows) {
+    const st = this.db.prepare(`INSERT INTO wh_item (tenant_id, item_code, item_name, purchase, active, default_wh, group_code, update_date) VALUES (?,?,?,?,?,?,?,?)
+      ON CONFLICT(tenant_id, item_code) DO UPDATE SET item_name = excluded.item_name, purchase = excluded.purchase, active = excluded.active,
+      default_wh = excluded.default_wh, group_code = excluded.group_code, update_date = excluded.update_date`);
+    this.tx(() => rows.forEach((i) => st.run(this.tenantId, i.itemCode, i.itemName ?? null, i.purchase ? 1 : 0, i.active ? 1 : 0, i.defaultWh || null, i.groupCode ?? null, i.updateDate ?? null)));
+  }
+
+  /** Consulta somente leitura ao espelho (usada pelas skills). Sempre filtra pela empresa. */
+  wh(sql, ...args) {
+    if (!/^\s*select\b/i.test(sql) || !/tenant_id\s*=\s*\?/i.test(sql)) throw new Error('Consulta ao espelho deve ser SELECT e filtrar tenant_id = ?');
+    return this.db.prepare(sql).all(this.tenantId, ...args);
   }
 
   close() { this.db.close(); }

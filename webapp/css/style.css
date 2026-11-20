@@ -364,3 +364,4 @@ html, body { height: 100%; }
 .pbBetoRecText { flex: 1 1 auto; min-width: 0; gap: 0.25rem; }
 .pbBetoRecHead { gap: 0.5rem; }
 .pbBetoImpact.sapMText { font-weight: 700; color: var(--pbInk) !important; }
+.pbBetoConn { gap: 0.75rem; margin-top: 0.5rem; }

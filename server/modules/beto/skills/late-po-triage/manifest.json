@@ -1,0 +1,13 @@
+{
+  "id": "late-po-triage",
+  "name": "Pedidos atrasados",
+  "version": "1.0.0",
+  "category": "saneamento",
+  "financialImpact": true,
+  "audience": "comprador",
+  "defaultEnabled": true,
+  "needsWarehouse": true,
+  "description": "Pedidos de compra em aberto com entrega vencida, por faixa de atraso, com o valor ainda em aberto. Candidatos a cobrar o fornecedor ou encerrar no SAP para liberar o saldo comprometido.",
+  "params": { "bands": [30, 90, 180] },
+  "reads": ["wh_po", "wh_po_line"]
+}

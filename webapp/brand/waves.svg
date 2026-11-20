@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" preserveAspectRatio="xMidYMid slice">
+  <!-- Ondas decorativas das áreas azuis (menu, cabeçalho, card de fornecedores). Fundo transparente. -->
+  <defs>
+    <linearGradient id="w" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#42B5FF" stop-opacity="0"/>
+      <stop offset="0.55" stop-color="#2C8CFF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#42B5FF" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="f" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1268D4" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#1268D4" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M-20 300 C 120 250, 240 340, 380 290 S 560 230, 640 262 L 640 420 L -20 420 Z" fill="url(#f)"/>
+  <path d="M-20 318 C 140 268, 260 360, 400 308 S 580 250, 640 280" fill="none" stroke="url(#w)" stroke-width="3"/>
+  <path d="M-20 346 C 160 300, 300 384, 440 336 S 600 288, 640 306" fill="none" stroke="url(#w)" stroke-width="1.6" opacity="0.8"/>
+  <path d="M-20 372 C 180 330, 330 400, 470 362 S 610 322, 640 334" fill="none" stroke="url(#w)" stroke-width="1" opacity="0.6"/>
+  <ellipse cx="470" cy="40" rx="230" ry="80" fill="none" stroke="#1268D4" stroke-opacity="0.3" stroke-width="18" transform="rotate(-12 470 40)"/>
+</svg>

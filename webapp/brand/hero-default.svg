@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" preserveAspectRatio="xMidYMid slice">
+  <!-- Ilustração padrão da faixa de boas-vindas (original, sem foto). Troque por uma imagem da empresa em "heroImage" no branding.json. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0B2B70"/>
+      <stop offset="1" stop-color="#061943"/>
+    </linearGradient>
+    <linearGradient id="wave1" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2C8CFF" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#2C8CFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#42B5FF" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="wave2" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0866E9" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0866E9" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5FB4FF"/>
+      <stop offset="1" stop-color="#0866E9" stop-opacity="0.35"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.35" r="0.45">
+      <stop offset="0" stop-color="#2C8CFF" stop-opacity="0.45"/>
+      <stop offset="1" stop-color="#2C8CFF" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#9CC8FF" fill-opacity="0.22"/>
+    </pattern>
+  </defs>
+  <rect width="960" height="280" fill="url(#bg)"/>
+  <rect width="960" height="280" fill="url(#glow)"/>
+  <rect x="420" width="540" height="280" fill="url(#dots)"/>
+  <!-- barras -->
+  <g fill="url(#bar)">
+    <rect x="560" y="150" width="26" height="130" rx="5"/>
+    <rect x="600" y="118" width="26" height="162" rx="5"/>
+    <rect x="640" y="132" width="26" height="148" rx="5"/>
+    <rect x="680" y="92" width="26" height="188" rx="5"/>
+    <rect x="720" y="104" width="26" height="176" rx="5"/>
+    <rect x="760" y="70" width="26" height="210" rx="5"/>
+    <rect x="800" y="84" width="26" height="196" rx="5"/>
+    <rect x="840" y="52" width="26" height="228" rx="5"/>
+  </g>
+  <!-- linha de tendência com nós -->
+  <polyline points="573,132 613,100 653,114 693,74 733,86 773,52 813,66 853,34" fill="none" stroke="#BFE1FF" stroke-width="3" stroke-linejoin="round"/>
+  <g fill="#FFFFFF" stroke="#42B5FF" stroke-width="3">
+    <circle cx="573" cy="132" r="5"/><circle cx="653" cy="114" r="5"/><circle cx="733" cy="86" r="5"/><circle cx="853" cy="34" r="6"/>
+  </g>
+  <!-- ondas -->
+  <path d="M0 230 C 160 190, 300 260, 460 222 S 760 168, 960 206 L 960 280 L 0 280 Z" fill="url(#wave2)"/>
+  <path d="M0 252 C 200 222, 360 280, 540 246 S 820 214, 960 238" fill="none" stroke="url(#wave1)" stroke-width="4"/>
+  <path d="M120 270 C 320 236, 480 284, 660 258 S 880 236, 960 250" fill="none" stroke="url(#wave1)" stroke-width="2" opacity="0.7"/>
+  <ellipse cx="760" cy="-30" rx="260" ry="90" fill="none" stroke="#1268D4" stroke-opacity="0.35" stroke-width="22" transform="rotate(-12 760 -30)"/>
+</svg>

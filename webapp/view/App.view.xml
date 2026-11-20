@@ -1,43 +1,15 @@
 <mvc:View controllerName="portal.b1.controller.App"
   xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:tnt="sap.tnt" xmlns:core="sap.ui.core" displayBlock="true">
-  <!-- Shell do portal: cabeçalho global + menu lateral (ocultos na tela de login). As telas continuam em <App id="app">. -->
-  <tnt:ToolPage id="toolPage" class="pbShell" sideExpanded="{shell>/sideExpanded}">
-    <tnt:header>
-      <tnt:ToolHeader class="pbTopbar">
-        <Button icon="sap-icon://menu2" type="Transparent" press=".onToggleSide" tooltip="{i18n>shellMenu}" class="pbTopBtn">
-          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
-        </Button>
-        <Image src="{= ${brand>/logoOnDark} || ${brand>/logo} }" class="pbTopLogo" decorative="false" alt="{brand>/company}" press=".onHome">
-          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
-        </Image>
-        <VBox class="pbTopTitle" visible="{= !${device>/system/phone} }">
-          <Title text="{brand>/productName}" level="H1" />
-          <Text text="{i18n>shellSubtitle}" />
-        </VBox>
-        <ToolbarSpacer />
-        <VBox class="pbTopCompany" visible="{= !${device>/system/phone} }" tooltip="{i18n>shellCompanyHint}">
-          <Text text="{i18n>company}" class="pbTopCaption" />
-          <Text text="{session>/tenant/name}" class="pbTopStrong" wrapping="false" />
-          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
-        </VBox>
-        <ToolbarSeparator class="pbTopSep" visible="{= !${device>/system/phone} }" />
-        <Button id="userBtn" type="Transparent" press=".onUserMenu" class="pbTopUser"
-          text="{= ${device>/system/phone} ? '' : ${session>/user/userName} }"
-          icon="sap-icon://person-placeholder" iconFirst="true" tooltip="{i18n>shellProfile}">
-          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
-        </Button>
-        <ToolbarSeparator class="pbTopSep" visible="{= !${device>/system/phone} }" />
-        <Button id="bellBtn" icon="sap-icon://bell" type="Transparent" press=".onBell" class="pbTopBtn"
-          tooltip="{= ${alerts>/total} ? ${i18n>shellAlerts} + ': ' + ${alerts>/total} : ${i18n>shellAlerts} }">
-          <customData>
-            <BadgeCustomData key="badge" value="{= String(${alerts>/total} || '') }" visible="{= ${alerts>/total} > 0 }" />
-          </customData>
-          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
-        </Button>
-      </tnt:ToolHeader>
-    </tnt:header>
-    <tnt:sideContent>
-      <tnt:SideNavigation id="sideNav" class="pbSideNav" itemSelect=".onNavSelect" selectedKey="{shell>/selectedKey}">
+  <!--
+    Shell do portal: menu lateral de altura total (logo, navegação, ajuda) + cabeçalho global.
+    As telas continuam em <App id="app">. Na tela de login o shell some (classe pbNoShell).
+  -->
+  <FlexBox id="shell" renderType="Bare" class="pbShell">
+    <VBox id="aside" renderType="Bare" class="pbAside">
+      <HBox renderType="Bare" class="pbBrand">
+        <Image src="{= ${brand>/logoOnDark} || ${brand>/logo} }" class="pbBrandLogo" decorative="false" alt="{brand>/company}" press=".onHome" />
+      </HBox>
+      <tnt:SideNavigation id="sideNav" class="pbSideNav" itemSelect=".onNavSelect" selectedKey="{shell>/selectedKey}" expanded="{shell>/navExpanded}">
         <tnt:item>
           <tnt:NavigationList id="navList" items="{shell>/nav}">
             <tnt:NavigationListItem key="{shell>key}" text="{shell>text}" icon="{shell>icon}" items="{path: 'shell>children', templateShareable: false}" expanded="false">
@@ -45,15 +17,48 @@
             </tnt:NavigationListItem>
           </tnt:NavigationList>
         </tnt:item>
-        <tnt:fixedItem>
-          <tnt:NavigationList visible="{= !!${brand>/supportUrl} }">
-            <tnt:NavigationListItem key="__help" text="{i18n>shellHelp}" icon="sap-icon://headset" />
-          </tnt:NavigationList>
-        </tnt:fixedItem>
       </tnt:SideNavigation>
-    </tnt:sideContent>
-    <tnt:mainContents>
-      <App id="app" />
-    </tnt:mainContents>
-  </tnt:ToolPage>
+      <VBox renderType="Bare" class="pbHelp" visible="{= !!${brand>/supportUrl} &amp;&amp; ${shell>/navExpanded} }">
+        <core:Icon src="sap-icon://headset" class="pbHelpIcon" decorative="true" />
+        <Text text="{i18n>shellHelpTitle}" class="pbHelpTitle" />
+        <Text text="{i18n>shellHelpText}" class="pbHelpText" />
+        <Button text="{i18n>shellHelpButton}" icon="sap-icon://arrow-right" iconFirst="false" press=".onHelp" class="pbHelpBtn" width="100%" />
+      </VBox>
+    </VBox>
+    <Button class="pbScrim" press=".onToggleSide" tooltip="{i18n>shellMenu}" visible="{shell>/overlay}" />
+    <VBox id="main" renderType="Bare" class="pbMain">
+      <OverflowToolbar class="pbTopbar" design="Transparent">
+        <Button icon="sap-icon://menu2" type="Transparent" press=".onToggleSide" tooltip="{i18n>shellMenu}" class="pbTopBtn">
+          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
+        </Button>
+        <VBox class="pbTopTitle" renderType="Bare">
+          <Title text="{brand>/productName}" level="H1" wrapping="false" />
+          <Text text="{brand>/tagline}" wrapping="false" class="pbTopTagline" />
+          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" shrinkable="true" /></layoutData>
+        </VBox>
+        <ToolbarSpacer />
+        <VBox class="pbTopCompany" renderType="Bare" tooltip="{i18n>shellCompanyHint}">
+          <Text text="{i18n>company}" class="pbTopCaption" />
+          <Text text="{session>/tenant/name}" class="pbTopStrong" wrapping="false" />
+          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
+        </VBox>
+        <ToolbarSeparator class="pbTopSep" />
+        <Avatar initials="{path: 'session>/user/userName', formatter: '.initials'}" displaySize="XS" backgroundColor="Accent6" press=".onUserMenu" class="pbTopAvatar" tooltip="{i18n>shellProfile}">
+          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
+        </Avatar>
+        <Button id="userBtn" type="Transparent" text="{session>/user/userName}" icon="sap-icon://slim-arrow-down" iconFirst="false" press=".onUserMenu" class="pbTopUser" tooltip="{i18n>shellProfile}">
+          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
+        </Button>
+        <ToolbarSeparator class="pbTopSep" />
+        <Button id="bellBtn" icon="sap-icon://bell" type="Transparent" press=".onBell" class="pbTopBtn"
+          tooltip="{= ${alerts>/total} ? ${i18n>shellAlerts} + ': ' + ${alerts>/total} : ${i18n>shellAlerts} }">
+          <customData>
+            <BadgeCustomData key="badge" value="{= String(${alerts>/total} || '') }" visible="{= ${alerts>/total} > 0 }" />
+          </customData>
+          <layoutData><OverflowToolbarLayoutData priority="NeverOverflow" /></layoutData>
+        </Button>
+      </OverflowToolbar>
+      <App id="app" class="pbPages" />
+    </VBox>
+  </FlexBox>
 </mvc:View>

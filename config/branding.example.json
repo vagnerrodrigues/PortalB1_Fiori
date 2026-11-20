@@ -3,6 +3,9 @@
   "company": "Blue Ocean",
   "logo": "brand/minha-logo.png",
   "logoOnDark": "brand/minha-logo-branca.png",
+  "tagline": "Gestão ágil e inteligente para sua empresa",
+  "heroImage": "brand/minha-imagem-de-boas-vindas.jpg",
+  "supportUrl": "https://suporte.minhaempresa.com.br",
   "colors": {
     "primary": "#070070",
     "primaryHover": "#0A0A9C",

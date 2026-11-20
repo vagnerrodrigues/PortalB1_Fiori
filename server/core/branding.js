@@ -11,6 +11,9 @@ const DEFAULT = {
   company: 'Blue Ocean',
   logo: 'brand/blueocean.png',             // logo para fundo claro (login)
   logoOnDark: 'brand/blueocean-white.png', // logo para a barra superior escura
+  tagline: 'Gestão ágil e inteligente para sua empresa', // subtítulo do cabeçalho
+  heroImage: 'brand/hero-default.svg',     // imagem da faixa de boas-vindas (troque por uma da empresa)
+  supportUrl: '',                          // link do "Abrir chamado" no menu (vazio = card oculto)
   colors: {
     primary: '#070070',      // azul-marinho Blue Ocean: botões principais, links, seleção
     primaryHover: '#0A0A9C',

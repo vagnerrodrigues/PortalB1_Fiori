@@ -44,14 +44,14 @@ sap.ui.define([
   return BaseController.extend("portal.b1.controller.App", {
     onInit: function () {
       this.getView().addStyleClass(this.getOwnerComponent().getContentDensityClass());
-      var bNarrow = Device.media.getCurrentRange(Device.media.RANGESETS.SAP_STANDARD).name === "Phone";
-      this.setModel(new JSONModel({ sideExpanded: !bNarrow, selectedKey: "home", nav: [] }), "shell");
+      this.setModel(new JSONModel({ navExpanded: true, overlay: false, selectedKey: "home", nav: [] }), "shell");
       this._routes = {};
       // setData() da sessão (login/troca de usuário) não dispara propertyChange: escuta pela binding
       this._modulesBinding = this.getModel("session").bindProperty("/modules");
       this._modulesBinding.attachChange(this._buildNav, this);
       this.getRouter().attachRouteMatched(this._onRoute, this);
-      Device.media.attachHandler(function (p) { this.getModel("shell").setProperty("/sideExpanded", p.name !== "Phone"); }, this);
+      Device.media.attachHandler(this._onMedia, this, Device.media.RANGESETS.SAP_STANDARD);
+      this._onMedia(Device.media.getCurrentRange(Device.media.RANGESETS.SAP_STANDARD));
       this._buildNav();
     },
 
@@ -89,7 +89,7 @@ sap.ui.define([
     _onRoute: function (oEvent) {
       var sName = oEvent.getParameter("name");
       var bLogin = sName === "login";
-      this.byId("toolPage").toggleStyleClass("pbNoShell", bLogin);
+      this.byId("shell").toggleStyleClass("pbNoShell", bLogin);
       if (bLogin) { return; }
       var sKey = ROUTE_KEY[sName] || MODULE_KEY[sName.split(".")[0]];
       if (sKey) { this.getModel("shell").setProperty("/selectedKey", sKey); }
@@ -97,19 +97,43 @@ sap.ui.define([
 
     onNavSelect: function (oEvent) {
       var sKey = oEvent.getParameter("item").getKey();
-      if (sKey === "__help") {
-        window.open(this.getModel("brand").getProperty("/supportUrl"), "_blank", "noopener");
-        return;
-      }
       var sRoute = this._routes[sKey];
       if (!sRoute) { return; } // grupo "Compras": só expande
       this.getRouter().navTo(sRoute);
-      if (Device.media.getCurrentRange(Device.media.RANGESETS.SAP_STANDARD).name === "Phone") { this.getModel("shell").setProperty("/sideExpanded", false); }
+      if (this._range === "Phone") { this._setOpen(false); }
+    },
+
+    /** Desktop: menu aberto; tablet: só ícones; celular: menu escondido, abre por cima do conteúdo. */
+    _onMedia: function (p) {
+      this._range = p.name;
+      var oShell = this.byId("shell");
+      oShell.toggleStyleClass("pbModePhone", p.name === "Phone");
+      oShell.toggleStyleClass("pbModeTablet", p.name === "Tablet");
+      this.getModel("shell").setProperty("/navExpanded", p.name !== "Tablet");
+      this._setOpen(false);
+    },
+
+    _setOpen: function (bOpen) {
+      this.byId("shell").toggleStyleClass("pbAsideOpen", bOpen);
+      this.getModel("shell").setProperty("/overlay", bOpen && this._range === "Phone");
     },
 
     onToggleSide: function () {
       var oShell = this.getModel("shell");
-      oShell.setProperty("/sideExpanded", !oShell.getProperty("/sideExpanded"));
+      if (this._range === "Phone") {
+        this._setOpen(!this.byId("shell").hasStyleClass("pbAsideOpen"));
+        return;
+      }
+      oShell.setProperty("/navExpanded", !oShell.getProperty("/navExpanded"));
+    },
+
+    onHelp: function () {
+      window.open(this.getModel("brand").getProperty("/supportUrl"), "_blank", "noopener");
+    },
+
+    initials: function (s) {
+      var p = String(s || "").trim().split(/\s+/).filter(Boolean);
+      return ((p[0] || "?")[0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
     },
 
     onHome: function () { this.getRouter().navTo("home"); },

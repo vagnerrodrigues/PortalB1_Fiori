@@ -39,7 +39,6 @@ sap.ui.define([
       var aModules = oSession.getProperty("/modules") || [];
       var oCompras = aModules.filter(function (m) { return m.id === "compras"; })[0];
       var bBuyer = !!(oCompras && oCompras.buyer);
-      var h = new Date().getHours();
       var sFirst = String(oSession.getProperty("/user/userName") || "").split(" ")[0];
       var cur = new Date().getFullYear();
       this._year = this._year || cur;
@@ -47,14 +46,15 @@ sap.ui.define([
       this._dash = null;
       this._prev = null;
       this._home().setData({
-        hello: this.text(h < 12 ? "homeMorning" : h < 18 ? "homeAfternoon" : "homeEvening", [sFirst]),
+        hello: this.text("homeHello", [sFirst]),
+        heroImg: this._heroImg(),
         subtitle: this.text("homeSubtitle", [oSession.getProperty("/tenant/name"),
           new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })]),
         buyer: bBuyer,
         year: String(this._year),
         years: [cur - 2, cur - 1, cur].map(function (n) { return { key: String(n) }; }),
         dash: { busy: bBuyer, error: false, vendors: [], consumed: 0, spendDelta: {}, hasContracts: false },
-        chart: { mode: (this._chart && this._chart.mode) || "12" },
+        chart: { mode: (this._chart && this._chart.mode) || "6" },
         alertsBusy: true,
         actions: [],
         modules: []
@@ -77,6 +77,12 @@ sap.ui.define([
         that._buildAlerts();
         if (bBuyer) { that._loadDash(false); } else { that._home().setProperty("/alertsBusy", false); }
       });
+    },
+
+    /** Imagem da faixa de boas-vindas: "heroImage" da marca (branding.json); sem imagem, só o fundo. */
+    _heroImg: function () {
+      var s = this.getModel("brand").getProperty("/heroImage");
+      return s ? "<div class=\"pbHeroImg\" style=\"background-image:url(&quot;" + esc(encodeURI(s)) + "&quot;)\"></div>" : "<div class=\"pbHeroImg pbHeroImgNone\"></div>";
     },
 
     // ---------- Ações rápidas e demais telas ----------
@@ -121,24 +127,33 @@ sap.ui.define([
       var d = this._dash;
       var fmt = this.formatter;
       var a = [];
-      var add = function (o) { a.push(o); };
+      var TONE = {
+        Error: { color: "#E34C55", bg: "#FFF0F0" }, Warning: { color: "#E0861A", bg: "#FFF5E8" }, Information: { color: "#0866E9", bg: "#EDF5FF" }
+      };
+      var add = function (o) {
+        var tone = TONE[o.state];
+        o.color = tone.color; o.bg = tone.bg;
+        o.html = "<strong style=\"color:" + tone.color + "\">" + esc(o.count) + "</strong> " + esc(o.label);
+        o.text = o.count + " " + o.label;
+        a.push(o);
+      };
       if (c["compras.approvals"] > 0) {
-        add({ text: this.text("alertApprovals", [int(c["compras.approvals"])]), icon: "sap-icon://approvals", color: "#DC2626", state: "Error", route: "compras.approvals" });
+        add({ count: int(c["compras.approvals"]), label: this.text("alertApprovals"), icon: "sap-icon://approvals", state: "Error", route: "compras.approvals" });
       }
       if (d && d.orders && d.orders.late.count > 0) {
-        add({ text: this.text("alertLate", [int(d.orders.late.count)]), detail: this.text("alertLateDetail", [fmt.money(d.orders.late.total), d.year]),
-          icon: "sap-icon://alert", color: "#DC2626", state: "Error", route: "compras.orders" });
+        add({ count: int(d.orders.late.count), label: this.text("alertLate"), detail: this.text("alertLateDetail", [fmt.money(d.orders.late.total), d.year]),
+          icon: "sap-icon://message-error", state: "Error", route: "compras.orders" });
       }
       if (c["compras.rfq"] > 0) {
-        add({ text: this.text("alertRfq", [int(c["compras.rfq"])]), detail: this.text("alertRfqDetail"), icon: "sap-icon://compare", color: "#D97706", state: "Warning", route: "compras.rfqs" });
+        add({ count: int(c["compras.rfq"]), label: this.text("alertRfq"), detail: this.text("alertRfqDetail"), icon: "sap-icon://history", state: "Warning", route: "compras.rfqs" });
       }
       if (c["compras.receipts"] > 0) {
-        add({ text: this.text("alertReceipts", [int(c["compras.receipts"])]), icon: "sap-icon://shipping-status", color: "#0866E9", state: "Information", route: "compras.receipts" });
+        add({ count: int(c["compras.receipts"]), label: this.text("alertReceipts"), icon: "sap-icon://message-information", state: "Information", route: "compras.receipts" });
       }
       if (d && d.agreements && d.agreements.expiring > 0) {
-        add({ text: this.text("alertContracts", [int(d.agreements.expiring)]), icon: "sap-icon://appointment-2", color: "#D97706", state: "Warning", route: "compras.contracts" });
+        add({ count: int(d.agreements.expiring), label: this.text("alertContracts"), icon: "sap-icon://appointment-2", state: "Warning", route: "compras.contracts" });
       }
-      this.getModel("alerts").setData({ items: a, total: a.length });
+      this.getModel("alerts").setData({ items: a, total: a.length, totalText: a.length ? this.text(a.length === 1 ? "alertsOne" : "alertsMany", [a.length]) : "" });
     },
 
     onAlert: function (oEvent) {
@@ -193,12 +208,20 @@ sap.ui.define([
       return s;
     },
 
-    /** Variação percentual com seta; neutra (gasto maior não é "bom" nem "ruim" por si). */
+    /** Variação percentual com seta (alta em verde, queda em vermelho, como no padrão visual do portal). */
     _delta: function (cur, prev) {
       if (!prev) { return { text: "", state: "None", icon: "" }; }
       var pct = ((cur - prev) / prev) * 100;
       var s = (Math.round(Math.abs(pct) * 10) / 10).toFixed(1).replace(".", ",") + "%";
-      return { text: s, state: "Information", icon: pct >= 0 ? "sap-icon://trend-up" : "sap-icon://trend-down" };
+      return { text: s, state: pct >= 0 ? "Success" : "Error", icon: pct >= 0 ? "sap-icon://arrow-top" : "sap-icon://arrow-bottom" };
+    },
+
+    /** Valor curto para o resumo do gráfico: R$ 51,29 mi / R$ 230,5 mil. */
+    _compact: function (v) {
+      var n = Number(v || 0);
+      if (Math.abs(n) >= 1e6) { return "R$ " + (n / 1e6).toFixed(2).replace(".", ",") + " mi"; }
+      if (Math.abs(n) >= 1e4) { return "R$ " + (n / 1e3).toFixed(1).replace(".", ",") + " mil"; }
+      return this.formatter.money(n);
     },
 
     _applyDash: function () {
@@ -227,7 +250,7 @@ sap.ui.define([
         var lp = d.orders.open.count ? Math.round((d.orders.late.count / d.orders.open.count) * 100) : 0;
         o.lateBar = "<div class=\"pbSplit\" title=\"" + lp + "% atrasados\"><span class=\"pbSplitOk\" style=\"width:" + (100 - lp) + "%\"></span><span class=\"pbSplitLate\" style=\"width:" + lp + "%\"></span></div>";
         var max = (d.orders.topVendors[0] && d.orders.topVendors[0].total) || 1;
-        o.vendors = d.orders.topVendors.map(function (v, i) {
+        o.vendors = d.orders.topVendors.slice(0, 3).map(function (v, i) {
           return { rank: String(i + 1), cardName: v.cardName || v.cardCode, totalText: fmt.money(v.total),
             bar: "<div class=\"pbVBar\"><span style=\"width:" + Math.max(Math.round((v.total / max) * 100), 2) + "%\"></span></div>" };
         });
@@ -245,8 +268,8 @@ sap.ui.define([
       o.hasContracts = !!d.agreements;
       if (d.agreements) {
         o.contracts = int(d.agreements.active);
-        o.consumed = Math.min(d.agreements.consumption || 0, 100);
-        o.consumedState = fmt.consumptionState(d.agreements.consumption);
+        var cp = Math.min(d.agreements.consumption || 0, 100);
+        o.consumedBar = "<div class=\"pbMeter\" title=\"" + fmt.pct(d.agreements.consumption || 0) + "\"><span style=\"width:" + cp + "%\"></span></div>";
         o.consumedText = this.text("homeConsumed", [fmt.pct(d.agreements.consumption || 0)]);
         o.expiring = d.agreements.expiring;
         o.expiringText = this.text("dashExpiring", [int(d.agreements.expiring)]);
@@ -260,8 +283,11 @@ sap.ui.define([
       var max = Math.max.apply(null, aValues.concat([1]));
       var step = 220 / (aValues.length - 1);
       var pts = aValues.map(function (v, i) { return (i * step).toFixed(1) + "," + (32 - (v / max) * 28).toFixed(1); }).join(" ");
-      return "<svg class=\"pbSpark\" viewBox=\"0 0 220 34\" preserveAspectRatio=\"none\" aria-hidden=\"true\">" +
-        "<polygon points=\"0,34 " + pts + " 220,34\" class=\"pbSparkFill\"/><polyline points=\"" + pts + "\" class=\"pbSparkLine\"/></svg>";
+      var yEnd = (32 - (aValues[aValues.length - 1] / max) * 28) / 34 * 100;
+      return "<div class=\"pbSparkWrap\"><svg class=\"pbSpark\" viewBox=\"0 0 220 34\" preserveAspectRatio=\"none\" aria-hidden=\"true\">" +
+        "<defs><linearGradient id=\"pbSparkG\" x1=\"0\" y1=\"0\" x2=\"0\" y2=\"1\"><stop offset=\"0\" stop-color=\"currentColor\" stop-opacity=\".22\"/><stop offset=\"1\" stop-color=\"currentColor\" stop-opacity=\"0\"/></linearGradient></defs>" +
+        "<polygon points=\"0,34 " + pts + " 220,34\" fill=\"url(#pbSparkG)\"/><polyline points=\"" + pts + "\" class=\"pbSparkLine\"/></svg>" +
+        "<i class=\"pbSparkDot\" style=\"top:" + yEnd.toFixed(1) + "%\"></i></div>";
     },
 
     // ---------- Visão de compras ----------
@@ -283,26 +309,38 @@ sap.ui.define([
       var prev = p && p.orders ? p.orders.monthly : null;
       var max = 1;
       for (var i = w.from; i <= w.to; i++) { max = Math.max(max, cur[i] || 0, prev ? prev[i] || 0 : 0); }
-      var html = "<div class=\"pbBars2\" role=\"img\" aria-label=\"" + esc(this.text("homeChartTitle")) + "\">";
+      var n = w.to - w.from + 1;
+      var lastShown = Math.min(w.to, this._lastMonth());
+      var cols = "", labels = "", pts = [], dots = "";
       for (var m = w.from; m <= w.to; m++) {
-        var hc = cur[m] ? Math.max(Math.round((cur[m] / max) * 100), 2) : 0;
-        var hp = prev && prev[m] ? Math.max(Math.round((prev[m] / max) * 100), 2) : 0;
+        var k = m - w.from;
+        var hc = cur[m] ? Math.max(Math.round((cur[m] / max) * 92), 2) : 0;
+        var hp = prev && prev[m] ? Math.max(Math.round((prev[m] / max) * 92), 2) : 0;
         var tip = MONTHS[m] + "/" + d.year + ": " + fmt.money(cur[m] || 0) + (prev ? " · " + MONTHS[m] + "/" + (d.year - 1) + ": " + fmt.money(prev[m] || 0) : "");
-        html += "<div class=\"pbB\" title=\"" + esc(tip) + "\"><div class=\"pbBPair\">" +
-          (prev ? "<span class=\"pbBPrev\" style=\"height:" + hp + "%\"></span>" : "") +
-          "<span class=\"pbBCur\" style=\"height:" + hc + "%\"></span></div><em>" + MONTHS[m] + "</em></div>";
+        cols += "<div class=\"pbB\" title=\"" + esc(tip) + "\"><span class=\"pbBCur\" style=\"height:" + hc + "%\"></span>" +
+          (prev ? "<span class=\"pbBPrev\" style=\"height:" + hp + "%\"></span>" : "") + "</div>";
+        labels += "<em>" + MONTHS[m] + "</em>";
+        if (m <= lastShown) {
+          var x = ((k + 0.5) / n) * 100;
+          pts.push(x.toFixed(2) + "," + (100 - hc).toFixed(2));
+          dots += "<i class=\"pbDot\" style=\"left:" + x.toFixed(2) + "%;bottom:" + hc + "%\"></i>";
+        }
       }
-      html += "</div>";
+      var html = "<div class=\"pbChart\" role=\"img\" aria-label=\"" + esc(this.text("homeChartTitle")) + "\">" +
+        "<div class=\"pbPlot\" style=\"grid-template-columns:repeat(" + n + ",minmax(0,1fr))\"><div class=\"pbGrid\"><i></i><i></i><i></i><i></i></div>" + cols +
+        (pts.length > 1 ? "<svg class=\"pbLine\" viewBox=\"0 0 100 100\" preserveAspectRatio=\"none\" aria-hidden=\"true\"><polyline points=\"" + pts.join(" ") + "\"/></svg>" : "") +
+        dots + "</div><div class=\"pbLabels\" style=\"grid-template-columns:repeat(" + n + ",minmax(0,1fr))\">" + labels + "</div></div>";
       // Comparação justa no ano corrente: só até o mês atual nos dois anos
       var cmpTo = Math.min(w.to, this._lastMonth());
       var sumCur = this._sum(cur, w.from, w.to);
       var sumPrev = prev && cmpTo >= w.from ? this._sum(prev, w.from, cmpTo) : 0;
       var cmpCur = cmpTo >= w.from ? this._sum(cur, w.from, cmpTo) : 0;
-      var period = MONTHS[w.from] + (w.to !== w.from ? "–" + MONTHS[w.to] : "") + " " + d.year;
+      var period = w.from === 0 && w.to === 11 ? this.text("homeChartYear", [d.year]) : MONTHS[w.from] + (w.to !== w.from ? "–" + MONTHS[w.to] : "") + " " + d.year;
       oHome.setProperty("/chart/bars", html);
-      oHome.setProperty("/chart/legend", "<div class=\"pbLegend\"><span><i class=\"pbLgCur\"></i>" + d.year + "</span>" +
-        (prev ? "<span><i class=\"pbLgPrev\"></i>" + (d.year - 1) + "</span>" : "") + "</div>");
-      oHome.setProperty("/chart/total", fmt.money(sumCur));
+      oHome.setProperty("/chart/legend", "<div class=\"pbLegend\"><span><i class=\"pbLgCur\"></i>" + esc(this.text("homeLegendCur")) + " " + d.year + "</span>" +
+        (prev ? "<span><i class=\"pbLgPrev\"></i>" + esc(this.text("homeLegendPrev")) + " (" + (d.year - 1) + ")</span>" : "") + "</div>");
+      oHome.setProperty("/chart/total", this._compact(sumCur));
+      oHome.setProperty("/chart/totalFull", fmt.money(sumCur));
       oHome.setProperty("/chart/totalLabel", this.text("homeChartTotal", [period]));
       oHome.setProperty("/chart/delta", this._delta(cmpCur, sumPrev));
       var cmpPeriod = cmpTo < w.to ? " (" + MONTHS[w.from] + "–" + MONTHS[cmpTo] + ")" : "";

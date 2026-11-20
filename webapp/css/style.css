@@ -105,25 +105,25 @@ html, body { height: 100%; }
 .pbAside { flex: 0 0 var(--pbAsideW); width: var(--pbAsideW); display: flex; flex-direction: column; height: 100%;
   background: linear-gradient(180deg, color-mix(in srgb, var(--pbNavy) 92%, #000) 0%, color-mix(in srgb, var(--pbNavy) 82%, #0B4FD0) 72%, color-mix(in srgb, var(--pbNavy) 92%, #000) 100%);
   color: #FFFFFF; transition: width 0.2s, flex-basis 0.2s; z-index: 20; overflow: hidden; }
-.pbBrand { height: 5.5rem; flex: 0 0 5.5rem; display: flex; align-items: center; padding: 0 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); box-sizing: border-box; }
-.pbBrandLogo { height: 2.25rem; width: auto; max-width: 100%; object-fit: contain; cursor: pointer; }
+.pbBrand { height: 3.75rem; flex: 0 0 3.75rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0 0.625rem 0 1.25rem; border-bottom: 1px solid rgba(255, 255, 255, 0.1); box-sizing: border-box; }
+.pbBrandLogo { height: 1.75rem; width: auto; max-width: 100%; object-fit: contain; cursor: pointer; }
 .pbMain { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; height: 100%; }
 .pbPages.sapMNav { flex: 1 1 auto; min-height: 0; height: auto !important; position: relative; }
 
 /* Cabeçalho */
-.pbTopbar.sapMTB { height: 5.5rem !important; flex: 0 0 5.5rem; padding: 0 2rem 0 0.75rem; border: 0 !important; position: relative; overflow: hidden;
+.pbTopbar.sapMTB { height: 3.75rem !important; flex: 0 0 3.75rem; padding: 0 2rem 0 0.75rem; border: 0 !important; position: relative; overflow: hidden;
   background: linear-gradient(105deg, color-mix(in srgb, var(--pbNavy) 92%, #000) 0%, color-mix(in srgb, var(--pbNavy) 80%, #0B4FD0) 100%) !important; }
 .pbTopbar.sapMTB::after { content: ""; position: absolute; width: 32rem; height: 11rem; right: 22%; top: -6.5rem; border: 1.5rem solid rgba(18, 104, 212, 0.33); border-radius: 50%; transform: rotate(-12deg); pointer-events: none; }
 .pbTopbar .sapMText, .pbTopbar .sapMTitle, .pbTopbar .sapMBtnIcon, .pbTopbar .sapMBtnContent, .pbTopbar .sapUiIcon, .pbTopbar .sapMBtnText { color: #FFFFFF !important; }
 .pbTopbar .sapMBtnInner { background: transparent !important; border-color: transparent !important; }
 .pbTopbar .sapMBtn:hover .sapMBtnInner { background: rgba(255, 255, 255, 0.12) !important; }
 .pbTopTitle { display: flex; flex-direction: column; margin-left: 0.5rem; position: relative; z-index: 1; min-width: 0; }
-.pbTopTitle .sapMTitle { font-size: 1.3125rem; font-weight: 700; }
-.pbTopTagline.sapMText { font-size: 0.875rem; color: #C8D8F5 !important; }
+.pbTopTitle .sapMTitle { font-size: 1.0625rem; font-weight: 700; line-height: 1.2; }
+.pbTopTagline.sapMText { font-size: 0.75rem; color: #C8D8F5 !important; }
 .pbTopCompany { display: flex; flex-direction: column; text-align: left; max-width: 16rem; position: relative; z-index: 1; }
 .pbTopCaption.sapMText { font-size: 0.75rem; color: #C4D5F4 !important; }
 .pbTopStrong.sapMText { font-weight: 600; }
-.pbTopSep.sapMTBSeparator { background: rgba(255, 255, 255, 0.25) !important; height: 2.5rem; width: 1px !important; min-width: 1px !important; margin: 0 1.25rem !important; border: 0 !important; }
+.pbTopSep.sapMTBSeparator { background: rgba(255, 255, 255, 0.25) !important; height: 1.75rem; width: 1px !important; min-width: 1px !important; margin: 0 1.25rem !important; border: 0 !important; }
 .pbTopAvatar.sapFAvatar { background: #75AAF8 !important; color: #0B1F4D !important; font-weight: 800; margin-right: 0.125rem; }
 .pbTopAvatar .sapFAvatarInitialsHolder { color: #0B1F4D !important; font-weight: 800; }
 .pbTopUser .sapMBtnText { font-weight: 600; }
@@ -153,7 +153,7 @@ html, body { height: 100%; }
 
 /* Tablet: menu só com ícones */
 .pbModeTablet .pbAside, .pbAside:has(.sapTntSideNavigationNotExpanded) { flex-basis: 4.25rem; width: 4.25rem; }
-.pbAside:has(.sapTntSideNavigationNotExpanded) .pbBrand { padding: 0 0.5rem; justify-content: center; }
+.pbAside:has(.sapTntSideNavigationNotExpanded) .pbBrand { padding: 0; justify-content: center; }
 .pbAside:has(.sapTntSideNavigationNotExpanded) .pbBrandLogo { height: 1.25rem; }
 .pbAside:has(.sapTntSideNavigationNotExpanded) .sapTntNLI > a { padding-left: 0; justify-content: center; }
 .pbAside:has(.sapTntSideNavigationNotExpanded) .sapTntNLI .sapTntNLIIcon { margin-right: 0; }
@@ -332,3 +332,10 @@ html, body { height: 100%; }
 .pbSideNav .sapTntNLI .sapTntNLIText { overflow: hidden; text-overflow: ellipsis; }
 .pbSideNav .sapTntNLIItemsContainer .sapTntNLI > a { padding-left: 2.75rem; }
 .pbSideNav .sapTntNLIItemsContainer .sapTntNLI .sapTntNLIText { font-size: 0.875rem; }
+
+/* Botão recolher/expandir o menu (< / >) */
+.pbCollapseBtn.sapMBtn { flex: 0 0 auto; }
+.pbCollapseBtn .sapMBtnInner { width: 2rem; height: 2rem; min-width: 2rem; border-radius: 999px !important; background: rgba(255, 255, 255, 0.10) !important; border: 1px solid rgba(255, 255, 255, 0.22) !important; }
+.pbCollapseBtn:hover .sapMBtnInner { background: rgba(255, 255, 255, 0.2) !important; }
+.pbCollapseBtn .sapMBtnIcon { color: #FFFFFF !important; font-size: 0.75rem !important; line-height: 1.875rem; width: 1.875rem; margin: 0; }
+.pbModePhone .pbCollapseBtn { display: none; }

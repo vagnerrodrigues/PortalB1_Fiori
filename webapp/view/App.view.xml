@@ -7,7 +7,9 @@
   <FlexBox id="shell" renderType="Bare" class="pbShell">
     <VBox id="aside" renderType="Bare" class="pbAside">
       <HBox renderType="Bare" class="pbBrand">
-        <Image src="{= ${brand>/logoOnDark} || ${brand>/logo} }" class="pbBrandLogo" decorative="false" alt="{brand>/company}" press=".onHome" />
+        <Image src="{= ${brand>/logoOnDark} || ${brand>/logo} }" class="pbBrandLogo" decorative="false" alt="{brand>/company}" press=".onHome" visible="{shell>/navExpanded}" />
+        <Button icon="{= ${shell>/navExpanded} ? 'sap-icon://navigation-left-arrow' : 'sap-icon://navigation-right-arrow' }"
+          tooltip="{= ${shell>/navExpanded} ? ${i18n>shellCollapse} : ${i18n>shellExpand} }" press=".onToggleSide" class="pbCollapseBtn" />
       </HBox>
       <tnt:SideNavigation id="sideNav" class="pbSideNav" itemSelect=".onNavSelect" selectedKey="{shell>/selectedKey}" expanded="{shell>/navExpanded}">
         <tnt:item>

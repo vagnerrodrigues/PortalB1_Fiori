@@ -15,6 +15,17 @@ Serviço Windows "Portal B1" (Node)  ← install-service.ps1
 SAP B1 Service Layer
 ```
 
+## Atualização com um clique (sem Git e sem NSSM)
+
+`atualizar.ps1` baixa a última versão do GitHub, faz backup em `C:\PortalB1-backups`, preserva `config` (tenants.json, branding.json, reports.json, settings, secret.key, brand), `data` e `logs`, e testa o `/api/health`. Se o teste falhar, volta o backup sozinho. O portal passa a rodar como **Tarefa Agendada `PortalB1`** (conta SYSTEM): sobe com o Windows, reinicia se cair e não depende de janela aberta. A saída fica em `logs\portal.out.log`.
+
+Primeira vez (PowerShell como Administrador):
+```powershell
+Invoke-WebRequest https://raw.githubusercontent.com/vagnerrodrigues/PortalB1_Fiori/main/deploy/windows/atualizar.ps1 -OutFile C:\PortalB1\atualizar.ps1 -UseBasicParsing
+powershell -ExecutionPolicy Bypass -File C:\PortalB1\atualizar.ps1 -Forcar -CriarAtalho
+```
+Depois: duplo clique em **Atualizar Portal B1** na Área de Trabalho. Opções: `-AgendarAtualizacao -Hora 03:00` (atualiza sozinho todo dia), `-Rollback` (volta o último backup), `-Mock` (demonstração).
+
 ## Requisitos do servidor
 
 | Item | Observação |

@@ -142,6 +142,7 @@ sap.ui.define([
     onLogout: function () {
       api.post("/api/logout").finally(function () {
         this.getModel("session").setProperty("/loggedIn", false);
+        this.getModel("alerts").setData({ items: [], total: 0 });
         this.getRouter().navTo("login", {}, true);
       }.bind(this));
     }

@@ -18,6 +18,8 @@ sap.ui.define([
       this.setModel(new JSONModel(Device).setDefaultBindingMode("OneWay"), "device");
       // Sessão: usuário, empresa e módulos liberados para ele
       this.setModel(new JSONModel({ loggedIn: false, user: {}, tenant: {}, modules: [], mock: false }), "session");
+      // Alertas e pendências: preenchido pela tela inicial, lido pelo sino do cabeçalho
+      this.setModel(new JSONModel({ items: [], total: 0 }), "alerts");
 
       // Identidade visual: padrão global (tela de login) e depois a da empresa logada
       this.setModel(new JSONModel({ productName: "Portal B1", company: "", logo: "", logoOnDark: "" }), "brand");

@@ -58,7 +58,7 @@ As propostas recebem selos (*Menor preço*, *Mais rápida*, *Recomendada*) e uma
 - Gera o **Recebimento de mercadorias (OPDN)** copiado do pedido (`BaseType 22`). O saldo continua em aberto no pedido, e o procedimento de autorização, se houver, vale igual.
 - Itens com nº de série continuam sendo recebidos no SAP.
 - **Quem recebe:** `moduleAccess.compras.receivers { "departments": [...], "users": [...] }`, além dos compradores. Sem regra de compradores nem de recebedores, todos que acessam Compras recebem.
-- **Validar no B1 real:** a localização Brasil pode exigir campos fiscais (utilização, CFOP etc.) no recebimento. O portal copia do pedido; se o SL recusar, o erro aparece na tela.
+- **CFOP no recebimento:** o portal copia CFOP e Utilização da linha do pedido. Se o pedido não tiver CFOP, usa `defaults.cfopEntrada` do `tenants.json` (`dentro`/`fora` comparando a UF do fornecedor com a da filial; `padrao` quando a UF não é encontrada). Sem nenhum dos dois, o recebimento é barrado com mensagem em português.
 
 **Mapa de relações** (no detalhe de solicitação, oferta e pedido): mostra, em cards ligados por setas, a cadeia solicitação → cotação online → ofertas → pedido → recebimento → nota fiscal/devolução, mais o contrato guarda-chuva consumido. Clique no card para abrir o documento. Usa vínculos nativos: `BaseType/BaseEntry` para trás. Para frente, busca todas as cópias com filtro nas linhas de destino (`DocumentLines/any(...)`); se o SL não aceitar, usa `TargetType/TargetAbsEntry`, que guarda só a última cópia. Usa também `AgreementNo` e a cotação do portal. Limite de 25 documentos por mapa.
 

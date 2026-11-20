@@ -1,23 +1,153 @@
 <mvc:View controllerName="portal.b1.controller.Home"
-  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m">
-  <Page>
-    <customHeader>
-      <Bar class="pbBrandBar">
-        <contentLeft>
-          <Image src="{= ${brand>/logoOnDark} || ${brand>/logo} }" class="pbLogo" decorative="false" alt="{brand>/company}" />
-          <ToolbarSeparator class="pbSep" />
-          <Title text="{brand>/productName}" class="pbProduct" level="H1" />
-          <Text text="{session>/tenant/name}" class="pbCompany" visible="{= !${device>/system/phone} }" />
-        </contentLeft>
-        <contentRight>
-          <Text text="{session>/user/userName}" visible="{= !${device>/system/phone} }" />
-          <Button icon="sap-icon://log" tooltip="{i18n>logout}" press=".onLogout" />
-        </contentRight>
-      </Bar>
-    </customHeader>
+  xmlns:mvc="sap.ui.core.mvc" xmlns="sap.m" xmlns:core="sap.ui.core">
+  <Page showHeader="false" class="pbHome">
     <content>
-      <VBox id="dash" class="sapUiMediumMarginBeginEnd sapUiMediumMarginTop" />
-      <VBox id="modules" class="sapUiMediumMargin" />
+      <VBox class="pbHomeWrap">
+
+        <!-- Saudação + ano do painel -->
+        <FlexBox justifyContent="SpaceBetween" alignItems="End" wrap="Wrap" class="pbWelcome">
+          <VBox>
+            <Title text="{home>/hello}" level="H1" class="pbHello" />
+            <Text text="{home>/subtitle}" class="pbMuted" />
+          </VBox>
+          <HBox alignItems="Center" visible="{home>/buyer}" class="pbWelcomeActions">
+            <SegmentedButton selectedKey="{home>/year}" selectionChange=".onYear" items="{home>/years}" class="pbYears">
+              <items><SegmentedButtonItem key="{home>key}" text="{home>key}" /></items>
+            </SegmentedButton>
+            <Button icon="sap-icon://refresh" type="Transparent" tooltip="{i18n>refresh}" press=".onRefresh" />
+          </HBox>
+        </FlexBox>
+
+        <MessageStrip text="{i18n>homeDashError}" type="Warning" showIcon="true" visible="{home>/dash/error}" class="sapUiSmallMarginBottom" />
+
+        <!-- Indicadores (painel do comprador) -->
+        <FlexBox class="pbKpis" visible="{home>/buyer}" busy="{home>/dash/busy}" busyIndicatorDelay="0" wrap="Wrap" alignItems="Stretch">
+          <VBox class="pbCard pbKpi">
+            <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://cart" class="pbKpiIcon pbIcBlue" /><Text text="{home>/dash/spendTitle}" /></HBox>
+            <Text text="{home>/dash/spend}" class="pbKpiValue" />
+            <Text text="{home>/dash/spendSub}" class="pbMuted pbSmall" />
+            <ObjectStatus text="{home>/dash/spendDelta/text}" state="{home>/dash/spendDelta/state}" icon="{home>/dash/spendDelta/icon}" visible="{= !!${home>/dash/spendDelta/text} }" class="pbTrend" />
+            <core:HTML content="{home>/dash/spark}" />
+          </VBox>
+          <VBox class="pbCard pbKpi">
+            <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://sales-order" class="pbKpiIcon pbIcViolet" /><Text text="{i18n>dashOpen}" /></HBox>
+            <Text text="{home>/dash/open}" class="pbKpiValue" />
+            <Text text="{home>/dash/openSub}" class="pbMuted pbSmall" />
+            <ObjectStatus text="{home>/dash/lateText}" state="{= ${home>/dash/late} > 0 ? 'Error' : 'Success' }"
+              icon="{= ${home>/dash/late} > 0 ? 'sap-icon://alert' : 'sap-icon://accept' }" class="pbTrend" />
+            <core:HTML content="{home>/dash/lateBar}" />
+          </VBox>
+          <VBox class="pbCard pbKpi">
+            <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://lead" class="pbKpiIcon pbIcGreen" /><Text text="{i18n>dashSaving}" /></HBox>
+            <Text text="{home>/dash/saving}" class="pbKpiValue" />
+            <Text text="{home>/dash/savingSub}" class="pbMuted pbSmall" />
+            <Text text="{home>/dash/rfqText}" class="pbMuted pbSmall sapUiTinyMarginTop" />
+          </VBox>
+          <VBox class="pbCard pbKpi" visible="{home>/dash/hasContracts}">
+            <HBox alignItems="Center" class="pbKpiTop"><core:Icon src="sap-icon://appointment-2" class="pbKpiIcon pbIcOrange" /><Text text="{i18n>dashContracts}" /></HBox>
+            <Text text="{home>/dash/contracts}" class="pbKpiValue" />
+            <Text text="{home>/dash/consumedText}" class="pbMuted pbSmall" />
+            <ProgressIndicator percentValue="{home>/dash/consumed}" displayOnly="true" showValue="false" state="{home>/dash/consumedState}" height="0.5rem" class="pbProgress" />
+            <ObjectStatus text="{home>/dash/expiringText}" state="{= ${home>/dash/expiring} > 0 ? 'Warning' : 'None' }" icon="sap-icon://appointment-2" />
+          </VBox>
+          <VBox class="pbCard pbVendors">
+            <HBox justifyContent="SpaceBetween" alignItems="Center">
+              <Title text="{i18n>dashTopVendors}" level="H2" />
+              <Link text="{i18n>homeSeeAll}" press=".onOrders" class="pbOnDarkLink" />
+            </HBox>
+            <VBox items="{home>/dash/vendors}">
+              <VBox class="pbVendor">
+                <HBox alignItems="Center">
+                  <Text text="{home>rank}" class="pbRank" />
+                  <Text text="{home>cardName}" tooltip="{home>cardName}" wrapping="false" class="pbVendorName" />
+                  <Text text="{home>totalText}" wrapping="false" class="pbVendorValue" />
+                </HBox>
+                <core:HTML content="{home>bar}" />
+              </VBox>
+            </VBox>
+            <Text text="{i18n>homeNoData}" visible="{= !${home>/dash/vendors/length} }" class="pbOnDarkMuted" />
+          </VBox>
+        </FlexBox>
+
+        <!-- Visão de compras + alertas -->
+        <FlexBox id="middle" class="pbMiddle" wrap="Wrap" alignItems="Stretch">
+          <VBox class="pbCard pbPanel pbChartPanel" visible="{home>/buyer}" busy="{home>/dash/busy}" busyIndicatorDelay="0">
+            <FlexBox justifyContent="SpaceBetween" alignItems="Center" wrap="Wrap" class="pbPanelHead">
+              <HBox alignItems="Center"><core:Icon src="sap-icon://cart" class="pbPanelIcon" /><Title text="{i18n>homeChartTitle}" level="H2" /></HBox>
+              <SegmentedButton id="chartMode" selectedKey="{home>/chart/mode}" selectionChange=".onChartMode" class="pbFilters">
+                <items>
+                  <SegmentedButtonItem key="6" text="{i18n>homeChart6}" />
+                  <SegmentedButtonItem key="12" text="{i18n>homeChart12}" />
+                  <SegmentedButtonItem key="custom" text="{i18n>homeChartCustom}" />
+                </items>
+              </SegmentedButton>
+            </FlexBox>
+            <core:HTML content="{home>/chart/legend}" />
+            <FlexBox wrap="Wrap" alignItems="Center" class="pbChartArea">
+              <core:HTML content="{home>/chart/bars}" />
+              <VBox class="pbChartSummary">
+                <Text text="{home>/chart/totalLabel}" class="pbMuted pbSmall" />
+                <Text text="{home>/chart/total}" class="pbChartTotal" wrapping="false" />
+                <ObjectStatus text="{home>/chart/delta/text}" state="{home>/chart/delta/state}" icon="{home>/chart/delta/icon}" visible="{= !!${home>/chart/delta/text} }" class="pbChartDelta" />
+                <Text text="{home>/chart/deltaLabel}" class="pbMuted pbSmall" />
+              </VBox>
+            </FlexBox>
+          </VBox>
+
+          <VBox class="pbCard pbPanel pbAlerts" busy="{home>/alertsBusy}" busyIndicatorDelay="0">
+            <HBox justifyContent="SpaceBetween" alignItems="Center" class="pbPanelHead">
+              <HBox alignItems="Center"><core:Icon src="sap-icon://bell" class="pbPanelIcon" /><Title text="{i18n>alertsTitle}" level="H2" /></HBox>
+              <ObjectStatus text="{= ${alerts>/total} > 0 ? String(${alerts>/total}) : '' }" state="Error" inverted="true" />
+            </HBox>
+            <List items="{alerts>/items}" showSeparators="Inner" noDataText="{i18n>alertsNone}" class="pbAlertList">
+              <CustomListItem type="Active" press=".onAlert">
+                <HBox alignItems="Center" class="pbAlert">
+                  <core:Icon src="{alerts>icon}" color="#FFFFFF" backgroundColor="{alerts>color}" size="0.875rem" class="pbAlertIcon" decorative="true" />
+                  <VBox class="pbAlertText">
+                    <Text text="{alerts>text}" />
+                    <Text text="{alerts>detail}" class="pbMuted pbSmall" visible="{= !!${alerts>detail} }" />
+                  </VBox>
+                  <core:Icon src="sap-icon://navigation-right-arrow" class="pbChevron" />
+                </HBox>
+              </CustomListItem>
+            </List>
+          </VBox>
+        </FlexBox>
+
+        <!-- Ações rápidas -->
+        <HBox alignItems="Center" class="pbSectionTitle"><core:Icon src="sap-icon://grid" class="pbPanelIcon" /><Title text="{i18n>homeQuick}" level="H2" /></HBox>
+        <List items="{home>/actions}" showSeparators="None" class="pbTileGrid" noDataText="{i18n>homeNoActions}">
+          <CustomListItem type="Active" press=".onTile">
+            <VBox class="pbAction">
+              <core:Icon src="{home>icon}" class="pbActionIcon" />
+              <HBox justifyContent="SpaceBetween" alignItems="Center">
+                <Text text="{home>title}" class="pbActionTitle" />
+                <core:Icon src="sap-icon://navigation-right-arrow" class="pbChevron" />
+              </HBox>
+              <Text text="{home>subtitle}" class="pbMuted pbSmall" />
+            </VBox>
+          </CustomListItem>
+        </List>
+
+        <!-- Demais telas de cada módulo (o launchpad anterior continua acessível) -->
+        <VBox items="{home>/modules}" class="pbAllModules">
+          <VBox>
+            <Title text="{home>title}" level="H3" class="pbModuleTitle" />
+            <List items="{path: 'home>tiles', templateShareable: false}" showSeparators="None" class="pbTileGrid pbTileGridSmall">
+              <CustomListItem type="Active" press=".onTile">
+                <HBox alignItems="Center" class="pbMiniTile">
+                  <core:Icon src="{home>icon}" class="pbMiniIcon" />
+                  <VBox class="pbMiniText">
+                    <Text text="{home>title}" class="pbActionTitle" wrapping="false" />
+                    <Text text="{home>subtitle}" class="pbMuted pbSmall" wrapping="false" />
+                  </VBox>
+                </HBox>
+              </CustomListItem>
+            </List>
+          </VBox>
+        </VBox>
+
+      </VBox>
     </content>
   </Page>
 </mvc:View>

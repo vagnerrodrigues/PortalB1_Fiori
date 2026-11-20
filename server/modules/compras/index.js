@@ -351,7 +351,7 @@ module.exports = {
         if (pl.serial) errors.push(`${name}: item controlado por número de série — registre este recebimento no SAP`);
         if (pl.batch && !String(l.batch || '').trim()) errors.push(`${name}: informe o lote`);
         if (l.expiry && !isDate(l.expiry)) errors.push(`${name}: validade inválida`);
-        l.batch = pl.batch ? String(l.batch).trim() : null;
+        l.batch = pl.batch ? String(l.batch).trim() : null; l.cfop = String(pl.cfop || (() => { const c = (req.tenant.defaults || {}).cfopEntrada; if (!c || typeof c !== 'object') return c; if (!po.ufVendor || !po.ufBranch) return c.padrao; return po.ufVendor === po.ufBranch ? c.dentro : c.fora; })() || '').trim(); l.usage = pl.usage ?? (req.tenant.defaults || {}).usage ?? undefined; if (!l.cfop && !mock) errors.push(`${name}: pedido sem CFOP. Preencha a Utiliza\u00e7\u00e3o/CFOP na linha do pedido no SAP ou defina "cfopEntrada" no tenants.json`);
       });
       if (p.comments && String(p.comments).length > 254) errors.push('Observações: máximo 254 caracteres');
       if (errors.length) return res.status(400).json({ error: errors.join('; '), errors });
@@ -361,7 +361,7 @@ module.exports = {
       const result = await b1.createGoodsReceipt(req.tenant, req.session.ctx, req.session.user, {
         poEntry: po.entry, cardCode: po.cardCode, branch: po.branch, date: p.date, numAtCard: String(p.numAtCard || '').slice(0, 100),
         comments: p.comments, attachmentEntry,
-        lines: lines.map((l) => ({ lineNum: Number(l.lineNum), quantity: Number(l.quantity), warehouse: l.warehouse, batch: l.batch, expiry: l.expiry || undefined }))
+        lines: lines.map((l) => ({ lineNum: Number(l.lineNum), quantity: Number(l.quantity), warehouse: l.warehouse, batch: l.batch, expiry: l.expiry || undefined, cfop: l.cfop || undefined, usage: l.usage }))
       });
       audit(req, 'GR_CREATE', { ...result, poEntry: po.entry });
       if (result.source === 'draft') notify.approvalRequested(req, b1, result.entry);

@@ -70,14 +70,16 @@ const proc = require('../modules/compras/sl-procure');
 
   const gr = await proc.createGoodsReceipt({ id: 't' }, {}, { userCode: 'u' }, {
     poEntry: 101, cardCode: 'F1', date: '2026-09-27', numAtCard: 'NF 1234',
-    lines: [{ lineNum: 0, quantity: 12, warehouse: '02' }, { lineNum: 2, quantity: 5, batch: 'L1', expiry: '2027-09-01' }]
+    lines: [{ lineNum: 0, quantity: 12, warehouse: '02' }, { lineNum: 2, quantity: 5, batch: 'L1', expiry: '2027-09-01', cfop: '2102', usage: 9 }]
   });
   assert.deepStrictEqual(gr, { kind: 'gr', source: 'doc', entry: 55, docNum: 8055, status: 'OPEN' });
   const grBody = calls.find((c) => c.p === '/PurchaseDeliveryNotes').body;
   assert.strictEqual(grBody.NumAtCard, 'NF 1234');
   assert.deepStrictEqual(grBody.DocumentLines[0], { BaseType: 22, BaseEntry: 101, BaseLine: 0, Quantity: 12, WarehouseCode: '02', BatchNumbers: undefined });
   assert.deepStrictEqual(grBody.DocumentLines[1].BatchNumbers, [{ BatchNumber: 'L1', Quantity: 5, ExpiryDate: '2027-09-01' }]);
-  console.log('  ✔ recebimento de mercadorias copiado do pedido (BaseType 22) com lote e validade');
+  assert.strictEqual(grBody.DocumentLines[1].CFOPCode, '2102');
+  assert.strictEqual(grBody.DocumentLines[1].Usage, 9);
+  console.log('  ✔ recebimento de mercadorias copiado do pedido (BaseType 22) com lote, validade, CFOP e utilização');
 
   const { linksOf } = require('../modules/compras/sl-relations');
   const lk = linksOf([

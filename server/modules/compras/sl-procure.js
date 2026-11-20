@@ -219,7 +219,7 @@ async function poForReceipt(tenant, ctx, entry) {
     .map((l) => ({
       lineNum: l.LineNum, itemCode: l.ItemCode, itemName: l.ItemDescription, uom: l.UoMCode || l.MeasureUnit || '',
       ordered: Number(l.Quantity) || 0, open: Number(l.RemainingOpenQuantity ?? l.Quantity) || 0,
-      unitPrice: l.UnitPrice ?? l.Price, warehouse: l.WarehouseCode || '', shipDate: d10(l.ShipDate)
+      unitPrice: l.UnitPrice ?? l.Price, warehouse: l.WarehouseCode || '', shipDate: d10(l.ShipDate), cfop: l.CFOPCode || '', usage: l.Usage ?? null
     })).filter((l) => l.open > 0);
   const codes = [...new Set(lines.map((l) => l.itemCode).filter(Boolean))];
   const flags = new Map();
@@ -230,11 +230,29 @@ async function poForReceipt(tenant, ctx, entry) {
       (r.value || []).forEach((it) => flags.set(it.ItemCode, { batch: it.ManageBatchNumbers === 'tYES', serial: it.ManageSerialNumbers === 'tYES' }));
     } catch (_) { /* sem leitura de itens: segue sem controle de lote */ }
   }
-  lines.forEach((l) => Object.assign(l, flags.get(l.itemCode) || { batch: false, serial: false }));
+  lines.forEach((l) => Object.assign(l, flags.get(l.itemCode) || { batch: false, serial: false })); const uf = await receiptUf(tenant, ctx, d);
   return {
     entry: d.DocEntry, docNum: d.DocNum, cardCode: d.CardCode, cardName: d.CardName, docDate: d10(d.DocDate), dueDate: d10(d.DocDueDate),
-    branch: d.BPL_IDAssignedToInvoice ?? null, status: base.mapDocStatus(d), numAtCard: d.NumAtCard || '', lines
+    branch: d.BPL_IDAssignedToInvoice ?? null, status: base.mapDocStatus(d), numAtCard: d.NumAtCard || '', lines, ufVendor: uf.vendor, ufBranch: uf.own
   };
+}
+
+/** UF do fornecedor e da filial que recebe: define CFOP de entrada dentro/fora do estado. */
+async function receiptUf(tenant, ctx, d) {
+  const ax = d.AddressExtension || {};
+  let vendor = ax.BillToState || '';
+  let own = ax.ShipToState || '';
+  if (d.BPL_IDAssignedToInvoice != null) {
+    try { const b = await sl.request(tenant, ctx.cookie, 'GET', `/BusinessPlaces(${Number(d.BPL_IDAssignedToInvoice)})`); if (b && b.State) own = b.State; } catch (_) { /* usa endereco do pedido */ }
+  }
+  if (!vendor) {
+    try {
+      const bp = await sl.request(tenant, ctx.cookie, 'GET', `/BusinessPartners('${enc(q(d.CardCode))}')?$select=BPAddresses`);
+      const a = bp.BPAddresses || []; const x = a.find((z) => z.AddressType === 'bo_BillTo') || a[0];
+      if (x && x.State) vendor = x.State;
+    } catch (_) { /* sem leitura do PN */ }
+  }
+  return { vendor: String(vendor).trim().toUpperCase(), own: String(own).trim().toUpperCase() };
 }
 
 /** Recebimento copiado do pedido (BaseType 22): quantidades, depósito e lotes. Aprovação nativa se houver. */
@@ -254,7 +272,7 @@ async function createGoodsReceipt(tenant, ctx, user, p) {
       BaseType: 22, BaseEntry: Number(p.poEntry), BaseLine: Number(l.lineNum),
       Quantity: Number(l.quantity),
       WarehouseCode: l.warehouse || undefined,
-      BatchNumbers: l.batch ? [{ BatchNumber: String(l.batch).slice(0, 36), Quantity: Number(l.quantity), ExpiryDate: l.expiry || undefined }] : undefined
+      ...(l.cfop ? { CFOPCode: l.cfop } : {}), ...(l.usage != null ? { Usage: l.usage } : {}), BatchNumbers: l.batch ? [{ BatchNumber: String(l.batch).slice(0, 36), Quantity: Number(l.quantity), ExpiryDate: l.expiry || undefined }] : undefined
     }))
   };
   return base.createDocument(tenant, ctx, 'gr', body, (d) => d.CardCode === p.cardCode);

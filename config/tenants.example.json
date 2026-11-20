@@ -20,6 +20,9 @@
         "departments": []
       }
     },
+    "defaults": {
+      "cfopEntrada": { "dentro": "1102", "fora": "2102", "padrao": "1102" }
+    },
     "bpLeadSeries": null,
     "reports": null,
     "expenseCategories": [
